@@ -1,0 +1,35 @@
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; This script calls mask_info.pro and generates information 
+; on the aperture masks used, and saves this to idl variables
+; Currently, gives (x,y) pupil postions in meters
+;                  (x,y) locations of Fourier Plane Coverage (in meters)
+; Lengths of baselines in a big vector (in meters)
+; Orientations of baselines in a big vector (in radians)
+
+d2r=3.141592/180
+
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; do the Pseudo-27 mask:
+
+msk_rot=-3.141592/2
+scale = .9          ; scale it way down because half the time the *stupid* Full_Uszd is employed ...
+rot=[[cos(msk_rot),sin(msk_rot)],[-sin(msk_rot),cos(msk_rot)]] 
+
+g_x = [ -3.515, -2.035, -2.590, -3.145, -2.775, -2.035, 0.7400, -0.7400, -1.110, 1.665, $
+     0.3700, 0.3700, -0.1850, -0.9250, -1.850, -3.515, -2.775, -2.590, 1.850, 1.665,  $
+      2.220, 3.330, 3.700, 3.885, 2.775, 3.515, 3.700]
+
+g_y = [ 0.106810, 0.747669, 1.06810, 2.02939, 2.67024, 3.31110, 3.63153, 3.63153, 3.63153, -3.09748, $
+  -2.13620, -2.77705, -3.73834, -3.73834, -3.41791, -1.17491, -2.45663, -2.77705, 2.99067, 1.38853, $
+   1.70896, 1.70896, 1.06810, 0.106810, -2.45663, -1.17491, -0.854478]
+
+
+g_xy=[[g_x],[g_y]]   
+g_xy=rot##g_xy * scale * 1000.0
+  
+mask_info,g_xy,xy_coords,F_cov,b_lengths,b_angles
+
+save, xy_coords, F_cov, b_lengths, b_angles, file='info_pseudo27.idlvar'
+
+end
+

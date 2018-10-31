@@ -1,0 +1,75 @@
+;;make the GPI mask info file;
+;;Need:
+;;     xy_coords
+;;     f_cov
+;;     b_lengths
+;;     b_angles
+
+name='g10s40'
+dir='~/code/masking/templates/gpi/'
+rot=-0.263*!pi/2 ;;rotation angle
+extra_scal=1.02
+;;of form: [[x,x,x,x,x,x,x,x],[y,y,y,y,y,y,y,y]]
+xy_coords= [[-1.061,-0.389,2.814,3.616,-4.419,-1.342,-4.672,4.157,5.091,1.599],[-3.882,-5.192,-0.243,0.995,2.676,5.077,-2.421,-2.864,0.920,4.929]] ;;in mm from centre of mask. Need in metres in pupil.
+mirrorsz=7.7701;;m (including baffling "to mask off a poor-quality edge" [Anand])
+masksz=11.998;;mm from Anand email
+
+;;rotate, flip and scale mask:
+xy_coords=[[xy_coords[*,1]],[xy_coords[*,0]]]
+;xy_coords[*,1]*=-1
+xy_coords*=extra_scal*mirrorsz/masksz ;;also converts to metres
+rot_xy_coords=xy_coords
+for i=0,n_elements(xy_coords)/2-1 do begin
+   oldx=xy_coords[i,0]
+   oldy=xy_coords[i,1]
+   theta=atan(oldx/oldy) ;;angle from y axis
+   
+   newx=oldx*sin(theta+rot)/sin(theta)
+   newy=oldy*cos(theta+rot)/cos(theta)
+   rot_xy_coords[i,*]=[newx,newy]
+endfor
+xy_coords=rot_xy_coords
+
+
+;;conica (for testing):
+;xy_coords=[[2.87276,2.68603,1.18984,1.09647,-0.119615,-1.98927,-3.39210],[-1.43811,2.12500,1.15336,2.93492,-3.38138, 2.77320,0.0200141]]
+
+n_holes=n_elements(xy_coords)/2
+;;get arrays ready:
+f_cov=fltarr(2,n_holes,n_holes)
+b_lengths=fltarr(n_holes,n_holes)
+b_angles=b_lengths
+
+for i=0,n_holes-1 do begin
+    this_xy=xy_coords[i,*]
+
+    for j=0,n_holes -1 do begin
+        new_xy=xy_coords[j,*]
+        
+        ;;f_cov is the distances between holes:
+        f_cov[*,j,i]=new_xy-this_xy
+        
+        ;;baseline length
+        b_lengths[j,i]=sqrt(total((new_xy-this_xy)^2))
+        
+        ;;baseline angle:
+        if i eq j then b_angles[j,i]=0 else begin
+            ang=atan((new_xy[1]-this_xy[1])/(new_xy[0]-this_xy[0]))
+            if j gt i then ang=ang+!dpi
+            b_angles[j,i]= ang
+        endelse
+    endfor
+endfor
+outname=dir+'info_'+name+'.idlvar'
+save,xy_coords,f_cov,b_lengths,b_angles,filename=outname
+;print,'Saved as: ',outname
+;;for testing:
+;xy_coords2=xy_coords
+;f_cov2=f_cov
+;b_lengths2=b_lengths
+;b_angles2=b_angles
+
+;restore,'~/code/masking/templates/conica/info_g7.idlvar'
+
+end
+

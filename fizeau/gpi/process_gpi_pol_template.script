@@ -1,0 +1,80 @@
+;; Example script to process GPI polarized data through pipeline.
+;; Will produce a few variables:
+;;  vis, cp, phase: all polarized differential quantities.
+;;       1st dimension is n_baselines or n_bispectra.
+;;       2nd dimension is 0 for data, 1 for uncertainties
+;;       3rd dimension is 0 for Stokes Q, 1 for Stokes U.
+;; az,bl: the azimuth and length of each baseline
+
+save_dir='~/data/gpi_data/gpi_Apr15/Analysis_poltests/'
+data_dir='~/data/gpi_data/gpi_Apr15/Cubed_poltests/'
+prefix='S20150414S'
+
+frames=419+findgen(5) ;;the numbers at the end of your data
+frames=[419,420,422,423,424,425,426,427,428,429,430,431,432,433,435,436,438]
+tsize=[-0.01+fltarr(17)] ;; files with the same number will be processed together, negative numbers note targets
+
+;; Things that you shouldnt need to touch
+jobname='' ;;just a name thats added to the files
+extn='_podc.fits'
+discard_sigma=[-2.,-2.,5.,-3.6,-0.7]
+nbootstrap=1000 ;; number of bootstrap iterations to get uncertainties
+
+;;!!!!!!!!!!!!!
+;;AUTOMATIC BELOW HERE
+;;!!!!!!!!!!!!!
+
+;;neither of these are needed in qbe_gpi (since they are done in the GPI pipeline)
+flatpath=''
+skies=0
+
+cd,save_dir
+
+;;cube the data
+qbe_gpi,data_dir, jobname, flatpath, frames,skies, tsize,extn=extn,prefix=prefix,cutsize=256,discard_sigma=discard_sigma,/pol
+;;get the visibilities and closure phases
+calc_bispect, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/"
+
+;; I lied. You need to choose which tsize value you set above for the target you want to look at
+stop
+tsize_target=-0.01
+
+;;set average_together=1 to average all of the frames before the second differential step.
+;; otherwise, it will calculate frame-by-frame and include the parallactic angle for each frame.
+gpi_pol_double_diff,"cubeinfo"+jobname+".idlvar",tsize_target,root_dir="~/code/masking/",$
+   nbootstrap=1000,save_name=save_name,average_together=0
+
+;;everything is saved in an idlvar file now, so restore it to load all of the arrays
+restore,save_name
+;;The arrays:
+;; vis, cp, ph             - the differential visibilities, closure phases and phases, and are [nframes x (n) x 2]
+;;                           the last dimension separates the 0 and 22.5 deg quantities.
+;; vis_err, cp_err, ph_err - the errors on vis, cp and ph, and are the same shape
+;; u, v                    - the uv coordinates for vis and ph, and are [nframes x nbaselines x 2]
+;;                           the last dimension separates the 0 and 22.5 deg quantities.
+;; bs_u and bs_v           - the uv coordinates for cp, and is [nframes x nbaselines x 3 x 2]
+;;                           3rd dimension is for the 3 baselines making the triangle, last dimension is for 0 and 22.5 deg quantities
+
+;; Also, here is a plot of visibility vs azimuth (coloured by baseline length) for you
+; 
+; az=atan(u,v)
+; bl=sqrt(u^2+v^2)
+; !p.multi=[0,1,2]
+; nbl= (size(vis))[2]
+; pos1=[0.05,0.1,0.45,0.9]
+; pos2=[0.51,0.1,0.91,0.9]
+; cbar_pos=[0.95, 0.10, 0.98, 0.90]
+
+; plot,az,vis,xtitle='Azimuth (rad)',ytitle='Differential Visibility',/nodata,yr=vrange,title='Stokes Q',position=pos1
+; for i=0,nbl-1 do begin
+;      col=255*bl[0,i,0]/max(bl)
+;      oploterr,az[*,i,0],vis[*,i,0],vis_err[*,i,0],psym=5,color=col
+; endfor
+; plot,[az,az],vis[*,0,*],xtitle='Azimuth (rad)',ytitle='Differential Visibility',/nodata,yr=vrange,title='Stokes U',position=pos2
+; for i=0,nbl-1 do begin
+;      col=255*bl[0,i,1]/max(bl)
+;      oploterr,az[*,i,1],vis[*,i,1],vis_err[*,i,1],psym=5,color=col
+; endfor
+; cgcolorbar,range=[min(bl),max(bl)],/vertical,position=cbar_pos
+; !p.multi=0
+end

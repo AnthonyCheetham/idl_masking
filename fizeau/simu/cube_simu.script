@@ -1,0 +1,160 @@
+dir='~/data/simu/Aug2014_data/'
+;dir='/import/pendragon1/latyshev/idl/3t0'
+t0=''
+!except=0
+;ao='no_ao'
+;ao='0.05'
+;ao='0.1'
+;ao='0.2'
+;ao='0.4'
+ao='0.6'
+;file=t0+'/'+'golay9_scale50_'+ao+'.fits'
+file='binary.fits'
+jobname=''
+
+;mf='simu/mf_golay9_old_wayMar13.idlvar'
+mf='simu/mf_golay9_kp.idlvar'
+
+params=[135.,0.,5.,0.001,0.001]
+window_mult=0.5
+window_type=[1,0]
+
+resave=0
+redo_bispect=0
+redo_calibrate=0
+redo_binary_grid=0
+
+correlation_plot=0 ;;model vs measured
+hist_plot=0 ;; histogram of measured values
+mod_plot=0 ;; model vs (model - measured) for calibrated target data.
+look_at_ft=0 ;;shows phase
+window_changes=1
+
+save_dir='~/data/simu/processed_one/'
+cd,save_dir
+
+outsz=256
+tsize=[0.01]
+if resave then begin
+   im=readfits(dir+file,head)
+   sz=(size(im))[1]
+   ;;cut down image
+   im=im[sz/2-outsz/2:sz/2+outsz/2-1,sz/2-outsz/2:sz/2+outsz/2-1,*]
+
+   ;;make cubeinfo
+   olog=make_olog(1,tsize,[file],0)
+   this=freud(head,ix=0,olog=olog)
+   filestring='0000'
+   filename='cube'+filestring+'.fits'
+   olog.cube_fname[0,0]=filename
+   olog.cube_fname[0,1]=filestring
+   save,olog,file='cubeinfo'+jobname+'.idlvar'
+   ;;save
+   writefits,'cube0000.fits',im
+endif
+
+!p.multi=0
+
+if redo_bispect then calc_bispect,save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/",mf_file=mf,window_mult=window_mult,window_type=window_type
+if redo_calibrate then calibrate_v2_cp,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/'
+
+restore,'bs0000.idlvar'
+save_clps=0
+if save_clps then begin
+   cp_all=atan(bs_all,/phase)
+   cps=reform(cp_all[0,*])
+
+   n_clps=84
+   outfile='~/Desktop/all_clps.txt'
+   openw,unit,outfile,/get_lun
+
+   ;format='(F15.10,F15.10)'
+   ;for i=0,n_clps-1 do begin
+   ;   printf,unit,cps[i]*180/!dpi,cp_sig[i],format=format
+   ;endfor
+
+   format='(84F15.10)'
+   for i=0,499 do begin
+      printf,unit,cp_all[i,*],format=format
+   endfor
+
+   close,unit
+endif
+;oif='old_way.oifits'
+;oif='new_way.oifits'
+;oif='Fake_0000.oifits'
+oif='Fake_0000mrg.oifits'
+if correlation_plot then begin
+   extract_t3data,t3data,file=oif
+   ;;calculate the binary model
+   mod_t3=binary_t3data(params,t3data=t3data)
+   mod_cps=mod_t3.t3phi
+   cps=t3data.t3phi
+   
+   ploterr,mod_cps,cps,cp_sig,psym=5
+   oplot,[-1e5,1e5],[-1e5,1e5],color=100
+endif
+;;old way: second peak at 300
+;;new way: second peak at 300
+;binary_grid,'Fake_0000.oifits',/use_cperr_bin,annuli=[10,20,30,40,50,60,70,80,90,100,120,140,160,180,200,220,240,260,280],nsim=long(30000),init_crat=5.
+
+if hist_plot then begin
+   cp_all=atan(bs_all,/phase)*180/!dpi
+   bin=1.0
+   plothist,cp_all[*,i],bin=bin,/peak
+   
+   err=cp_sig[i]*180/!dpi
+   
+   ;gaus
+   n=1000
+   x=2*(findgen(n)/(n-1)-0.5)*8
+   gaus=exp(-(x-bin/2.)^2/(2*(err*sqrt(500))^2))
+
+   oplot,x,gaus,color=100
+   print,err,(sqrt(moment(cp_all[*,i])))[1]/sqrt(500)
+   print,cp[i]*180/!dpi,(moment(cp_all[*,i]))[0]
+endif
+
+if mod_plot then begin
+   oif='Fake_0000.oifits'
+   extract_t3data,t3data,file=oif
+   mt3=binary_t3data(params,t3data=t3data)
+
+   ploterr,mt3.t3phi,(t3data.t3phi-mt3.t3phi),t3data.t3phierr,psym=5,ytitle='Difference from model',xtitle='Model cp'
+   ;oplot,[-50,50],[-50,50],color=100
+   oplot,[-50,50],[0,0],color=100
+endif
+
+if look_at_ft then begin
+   x=readfits('cube0000.fits')
+   y=x[*,*,0]
+   image_cont,atan(shiftfft(y),/phase),/n,/a
+endif
+
+if window_changes then begin
+   extract_t3data,t1,file='window_1.oifits'
+   extract_t3data,t0,file='no_window.oifits'
+   extract_t3data,t2,file='window_2.oifits'
+   extract_t3data,t5,file='window_5.oifits'
+   extract_t3data,t10,file='window_10.oifits'
+   extract_t3data,t100,file='window_100.oifits'
+   extract_t3data,t05,file='window_0.5.oifits'
+
+   wszs=[0.5,1.,2.,5.,10.,100.,1000.]
+   ;;get the max diff from model
+   m1=max(abs(mt3.t3phi-t1.t3phi))
+   m0=max(abs(mt3.t3phi-t0.t3phi))
+   m2=max(abs(mt3.t3phi-t2.t3phi))
+   m5=max(abs(mt3.t3phi-t5.t3phi))
+   m10=max(abs(mt3.t3phi-t10.t3phi))
+   m100=max(abs(mt3.t3phi-t100.t3phi))
+   m05=max(abs(mt3.t3phi-t05.t3phi))
+   ms=[m05,m1,m2,m5,m10,m100,m0]
+
+
+   ;;plot them
+   plot,wszs,ms,psym=-5,/xlog
+
+endif
+
+end

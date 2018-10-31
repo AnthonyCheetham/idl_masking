@@ -1,0 +1,28 @@
+SPHERE pipeline notes:
+ZIMPOL:
+	- A zimpol image file has 2 images in it.
+	- The chip is 2048x2048, with 2/4 rows covered. Half of chip is used as buffer, so it is really 2048 x 1024.
+	- Usually want x binning of 2 so it is square. (1024x1024)
+	- But get different polarizations in alternate rows of data in the binned image. So actually 1024 x 512 x 2
+	- In the pipeline, we should extract the two images and then bin the x direction again so we have 512 x 512 x 2 and square.
+	- 7mas/pixel for 512x512 image. So Nyquist sampled at lamba > 550nm.
+	- We ask for NDIT images. So 512 x 512 x NDIT x 2
+	- Always, after NDITs two polarization channels are swapped with a HWP and another NDIT images are taken. so 512 x 512 x NDIT x 2, with another frame saved as another extension.
+	- There are 2 detectors, so this will all be repeated and saved as another extension in the fits file.
+	- We want to save files like cube000i_j so that j is either 0 or 1 for the odd/even rows, and i is the hwp rotation index. So for one file, detector 1 goes to cube0000_j and detector 2 goes to cube0002_j
+
+qbe_sphere:
+	-Works for IRDIS
+	-Need to add code for ZIMPOL, IFS
+
+template files:
+	-Do we want dual band IRDIS or just single?
+	-Need to make for IRDIS, IFS, ZIMPOL
+
+other to do:
+	- which calc_bispect do we want to use? _gpi keeps the different channels separate
+	- Why doesn't the V2 extraction work properly?
+
+DONE:
+	-freud
+	-inquire

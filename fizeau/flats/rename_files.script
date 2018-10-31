@@ -1,0 +1,19 @@
+;; rename files
+;; Note: file extension must be .fits
+
+data_dir='/Users/cheetham/data/sphere_data/HD100546_SAM/'
+
+files=findfile(data_dir+'/*.fits')
+nf=n_elements(files)
+
+for ix=0,nf-1 do begin
+    oldname=files[ix]
+
+    head=headfits(oldname)
+    newname=sxpar(head,'ORIGFILE')+'.Z'
+
+    cmd='mv '+oldname+' '+data_dir+newname
+    spawn,cmd
+endfor
+
+end

@@ -1,0 +1,93 @@
+;make_info.script
+;make_tmpl.script
+
+dir='~/data/sphere_data/'
+dir = '~/data/sphere_data/HIP73990_SAM/'
+clean=0
+
+ins='IRDIS'
+ins='IFS'
+
+
+if ins eq 'IFS' then begin
+    dir+= 'IFS/'
+    band='YJH_Test'
+    mf_file='~/code/masking/templates/sphere/mf_7Hole_IFS_'+band+'.idlvar'
+endif else if ins eq 'IRDIS' then begin
+    dir+='IRDIS/'
+    band='D_K12_Test'
+    ; band='D_K12'
+    mf_file='~/code/masking/templates/sphere/mf_7Hole_IRDIS_'+band+'.idlvar'
+endif
+
+
+im = dir+'Analysis/cube0001.fits'
+
+restore,mf_file
+
+x=readfits(im)
+
+if clean then begin
+    bpix=dir+'test/badpix.fits'
+    bad_pix=readfits(bpix)
+    bad_pixels=where(bad_pix eq 1)
+
+    flat=dir+'test/H_flat.fits'
+    flat=readfits(flat)
+
+    window_size=30
+    sz=256
+    cen=[516,491]
+
+    win=shift(exp(-(dist(sz)/window_size*0.91244d)^4),sz/2,sz/2)
+
+    nf=(size(x))[3]
+    totim=0
+    ps=0
+    for ix=0,nf-1 do begin
+        im=x[*,*,ix]
+        im[bad_pixels]=0
+        im=fix_bad_pixels(im,bad_pixels=bad_pixels)
+        im/=flat
+        x[*,*,ix]=im
+
+        im=im[cen[0]-sz/2:cen[0]+sz/2-1,cen[1]-sz/2:cen[1]+sz/2-1]
+        totim+=im
+        im=im*win
+        ft=shiftfft(im)
+        ps+=abs(ft)
+
+        image_cont,im,/n,/a
+        wait,0.2
+    endfor
+    image_cont,alog10(ps),/n,/a
+    stop
+endif else begin
+
+    if ins eq 'ifs' then chans=[5,25]
+    if ins eq 'irdis' then chans=[0,1]
+    x=total(x,3)
+
+    fts=dcomplexarr(256,256,2)
+    fts[*,*,0]=fft(x[*,*,chans[0]])
+    fts[*,*,1]=fft(x[*,*,chans[1]])
+
+    fts=abs(fts)^0.2
+    wset,1
+    !p.multi=[0,2,1]
+    dummy0=fltarr(256,256)
+    dummy0[mf_pvct[mf_ix[0,0,chans[0]]:mf_ix[1,-1,chans[0]]]]=1.5
+    disp_im=dummy0+fts[*,*,0]
+    disp_im=shift(disp_im,128,128)
+    image_cont,disp_im,/n,/a
+
+    dummy1=fltarr(256,256)
+    dummy1[mf_pvct[mf_ix[0,0,chans[1]]:mf_ix[1,-1,chans[1]]]]=1.5
+    disp_im=dummy1+fts[*,*,1]
+    disp_im=shift(disp_im,128,128)
+    image_cont,disp_im,/n,/a
+
+    !p.multi=0
+    wset,0
+endelse
+end

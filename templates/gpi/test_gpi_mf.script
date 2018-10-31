@@ -1,0 +1,50 @@
+dir='~/data/gpi_data/'
+
+band='Y'
+wavs=[0,36]
+
+
+if band eq 'Y' then begin
+   dir=dir+'gpi_Mar14/Cubed_imaging/'
+   im=dir+'S20140324S0193_spdc.fits'
+endif else if band eq 'J' then begin
+   dir=dir+'gpi_May14/Cubed_hd142527_J/'
+   im=dir+'S20140512S0138_spdc.fits' ;;J band image May2014
+endif else if band eq 'H' then begin
+   dir=dir+'gpi_Mar14/Cubed_imaging/'
+   im=dir+'S20140324S0174_spdc.fits' ;;H band image May2014
+endif else if band eq 'K1' then begin
+stop
+endif else if band eq 'K2' then begin
+stop
+endif
+
+;mf_file='~/code/masking/templates/gpi/old/mf_g10s40_'+band+'_pix.idlvar'
+mf_file='~/code/masking/templates/gpi/mf_g10s40_'+band+'_pix.idlvar'
+restore,mf_file
+
+x=readfits(im,/ext)
+x=reverse(x)
+
+x[where(x ne x)]=median(x)
+sz=256
+x=x[281/2-sz/2:281/2+sz/2-1,281/2-sz/2:281/2+sz/2-1,*]
+
+fts=dcomplexarr(256,256,2)
+fts[*,*,0]=fft(x[*,*,wavs[0]])
+fts[*,*,1]=fft(x[*,*,wavs[1]])
+
+fts=abs(fts)^0.2
+wset,1
+!p.multi=[0,2,1]
+dummy0=fltarr(256,256)
+dummy0[mf_pvct[mf_ix[0,0,wavs[0]]:mf_ix[1,44,wavs[0]]]]=0.5
+image_cont,fts[*,*,0]+dummy0,/n,/a,tit='Wav '+strcompress(string(wavs[0]),/rem)
+
+dummy1=fltarr(256,256)
+dummy1[mf_pvct[mf_ix[0,0,wavs[1]]:mf_ix[1,44,wavs[1]]]]=0.5
+image_cont,fts[*,*,1]+dummy1,/n,/a,tit='Wav '+strcompress(string(wavs[1]),/rem)
+
+!p.multi=0
+wset,0
+end

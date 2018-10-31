@@ -1,0 +1,470 @@
+;This script takes a filter and the xy_coords of a mask in m and produces
+;a matched-filter data cube, and the uv_coords of the baselines.
+;xy_coords:	fltarr(n_holes,2)	coordinates in m of holes
+;hole_diam:	float			hole diamdter
+;filter:	fltarr(2)		wavelength and full width of filter
+;chipsz	        float			size of detector array (eg 256)
+;
+; Written (based on make_mf)	PGT Mar13
+; *********************************************************
+; **  Make sure only one option is set in any given cell **
+; *********************************************************
+
+; Generate a file name for the output matched-filter
+; in a standard way using 3 identifiers below and filname above:
+;----------------------------------------------------------
+;instrument='nirc2'
+;instrument='nirc'
+;instrument='pharo'
+;instrument='lws'
+;instrument =  'trecs'
+;instrument =  'jwst'
+;instrument = 'conica'
+;instrument = 'vampires'
+; instrument = 'gpi'
+instrument = 'sphere'
+;----------------------------------------------------------
+
+;----------------------------------------------------------
+chipsz = 256 	; array size.
+;chipsz = 150
+;chipsz = 184 	; array size.
+;chipsz = 128 	; array size.
+;chipsz =  64
+;chipsz =  34
+;----------------------------------------------------------
+
+;----------------------------------------------------------
+;rad_pixel =  mas2rad(1066.23035/34.)
+;rad_pixel =  mas2rad(8710.3814/134.)
+;rad_pixel =  mas2rad(65.0) ;JWST
+;rad_pixel = mas2rad(0.009942*1000.0)  ;Hi resolution NIRC2
+;rad_pixel = mas2rad(20.57) 	; Pixels/Radian for Keck data
+;
+;rad_pixel = mas2rad(25.2) 	; Palomar (Jamie + HIPPARCOS binary.)
+;rad_pixel = mas2rad(81.0) ;See ~gekko/text/lws,
+                                ;and LWS web page.
+;rad_pixel =  mas2rad(89.0) ;T-ReCS N band 
+;!!! was 89.76. The new value is correct from headers.
+;rad_pixel =  mas2rad(86.33) ;T-ReCS Q band
+;rad_pixel = mas2rad(13.27)  & camname='S13'    ; CONICA camera S13 (p.12 manual)
+;rad_pixel = mas2rad(27.19)  & camname='L27'    ; CONICA camera L27
+;rad_pixel = mas2rad(27.05)  & camname='S27'    ; CONICA camera S27
+;rad_pixel = mas2rad(8.)  ; ???? VAMPIRES
+;rad_pixel = mas2rad(14.3) ;; GPI (from GPI website, +/- 0.1mas/pix)
+; rad_pixel = mas2rad(14.14) ;; GPI (from Konopacky SPIE 2014, +/- 0.01mas/pix)
+; rad_pixel = mas2rad(12.237)      ; SPHERE IRDIS plate scale (12.2525 (average H2 H3 plate scale with coro) / 1.0015)
+; rad_pixel = mas2rad(12.267/1.0015)  ; SPHERE IRDIS plate scale for K1.
+rad_pixel = mas2rad(7.46)       ; SPHERE IFS scaled plate scale from headers
+; rad_pixel = mas2rad(6.8)         ; SPHERE ZIMPOL plate scale from headers
+;----------------------------------------------------------
+
+;-------------------x2---------------------------------------
+;tmpl_root='~/code/templates/'
+tmpl_root='~/code/masking/templates/'
+;----------------------------------------------------------
+;---JWST---               (hole_diam=0.933/0.7 for Loose/Tight criterion JWST 7h *not used*)
+;maskname =  'g7s6'     & hole_diam =  0.8      & restore,  tmpl_root+'/jwst/info_g7s6.idlvar'
+;maskname =  'g7s2'     & hole_diam =  0.8      & restore,  tmpl_root+'/jwst/info_g7s2.idlvar'
+;maskname =  'g15s14'   & hole_diam =  0.36     & restore,  tmpl_root+'/jwst/info_g15s14.idlvar'
+;---NIRC2---
+;maskname = 'g18'       & hole_diam = 0.506     & restore, tmpl_root+'/nirc2/info_g18.idlvar' 
+;maskname = 'g9'        & hole_diam = 1.1       & restore, tmpl_root+'/nirc2/info_g9.idlvar'
+;maskname = 'g9w'       & hole_diam = 1.1       & restore, tmpl_root+'/nirc2/info_g9w.idlvar'
+;---NIRC---
+;maskname='g21_35'      & hole_diam = 0.35      & restore, tmpl_root+'/nirc/info_g21_35.idlvar'
+;maskname='psob_30'     & hole_diam = 0.3       & restore, tmpl_root+'/nirc/info_ps36ob.idlvar'
+;maskname='g21_35_May03'& hole_diam = 0.35      & ???
+;---PHARO---
+;maskname ='p9'         & hole_diam = 0.42      & restore, tmpl_root+'/pharo/info_g9.idlvar'
+;maskname='p18'         & hole_diam = 0.21      & restore, tmpl_root+'/pharo/info_18.idlvar'
+;maskname='15h_Sep03'   & hole_diam = ??        & restore, tmpl_root+'/pharo/15h_sep03.idlvar'
+;maskname='14h_Sep03'   & hole_diam = 0.21      & restore, tmpl_root+'/pharo/14h_sep03.idlvar'
+;maskname='9h_Sep03'    & hole_diam = 0.42      & restore, tmpl_root+'/9h_sep03.idlvar'
+;maskname = 'p9s2'      & ???   ;Palomar 9  hole mask used on early runs
+;---T-ReCS--- (note diam is a guess)
+;;maskname = '?????'    & hole_diam =  1.2      & restore,  tmpl_root+'/trecs/info_mag7.idlvar'
+;---CONICA---
+;maskname = '18Holes'    & hole_diam =  0.37     & restore,  tmpl_root+'/conica/info_g18.idlvar'
+;maskname = '9Holes'    & hole_diam =  0.92     & restore,  tmpl_root+'/conica/info_g9.idlvar'
+;maskname = 'BB_9Holes' & hole_diam =  0.78     & restore,  tmpl_root+'/conica/info_g9bb.idlvar'
+;maskname = '7Holes'    & hole_diam =  1.2      & restore,  tmpl_root+'/conica/info_g7.idlvar'
+;maskname = '18Holes-1' & hole_diam =  0.37     & restore,  tmpl_root+'/conica/info_g18-1.idlvar' ; with missing bottom hole!
+;maskname = '18Holes-13'& hole_diam =  0.37     & restore,  tmpl_root+'/conica/info_g18-13.idlvar' ; with missing hole 13!
+;maskname = 'pseudo27'  & hole_diam =  0.2      & restore,  tmpl_root+'/conica/info_pseudo27.idlvar' 
+;maskname = 'pseudo18'  & hole_diam =  0.17      & restore,  tmpl_root+'/conica/info_pseudo18.idlvar'
+;maskname = 'pseudo9'  & hole_diam =  0.17      & restore,  tmpl_root+'/conica/info_pseudo9.idlvar' 
+;;---VAMPIRES---
+;maskname = 'undefined' & hole_diam = ??        & restore,  tmpl_root+'/vampires/info_9h.idlvar'
+;;---LWS---
+;restore, '~/code/templates/lws/info_pattern3' + subarr +'.idlvar'
+;restore, '~/code/templates/lws/info_pattern6' + subarr +'.idlvar'
+;restore, '~/code/templates/lws/info_pattern7' + subarr +'.idlvar'
+;---GPI---
+;maskname='g10s40' & hole_diam = 0.6605 & restore,  tmpl_root+'/gpi/info_g10s40.idlvar'; holes 0.920mm on mask
+;---SPHERE---
+; maskname='7Hole_IRDIS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IRDIS.idlvar' ; no idea of hole size
+maskname='7Hole_IFS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IFS.idlvar' ; no idea of hole size
+; maskname='7Hole_ZIMPOL' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_ZIMPOL.idlvar' ; no idea of hole size
+; maskname='7Hole_ZIMPOL' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_ZIMPOL_pol.idlvar' ; no idea of hole size
+;---- SIMU----
+;     maskname = 'golay9' & hole_diam = 0.92d & restore,'~/code/masking/templates/simu/info_golay9.idlvar'
+;maskname = 'g18' & hole_diam = 0.42d & restore,'~/code/masking/templates/simu/info_g18.idlvar'
+
+
+
+special=''
+
+;... For pattern 3 ...
+if (strcmp(maskname,  'pattern3', 8)) then begin
+ plot, xy_coords[*,0], xy_coords[*,1], psym=3, xrange=[-5,5], yrange=[-5,5]
+; cursor,  x0,  y0
+; dummy = min((xy_coords[*, 0]-x0)^2+(xy_coords[*, 1]-y0)^2 , in0)
+; wait,  0.3
+; cursor,  x0,  y0
+; dummy = min((xy_coords[*, 0]-x0)^2+(xy_coords[*, 1]-y0)^2, in1)
+; print,  in0, in1
+; stop
+ if (subarr eq 'd') then chs =  [[0, 4], [1, 6], [2, 8]] else $
+   chs =  [[0, 3], [1, 5], [2, 7]]
+ for j = 0, 2 do begin
+  inc = (xy_coords[chs[1, j],*]-xy_coords[chs[0, j],*])/9. ;Shift these holes apart slightly...
+  xy_coords[chs[0, j],*] = xy_coords[chs[0, j],*] - inc
+  xy_coords[chs[1, j],*] = xy_coords[chs[1, j],*] + inc
+ endfor 
+ oplot, xy_coords[*,0], xy_coords[*,1], psym=4
+ wait,  0.5
+endif
+;... For pattern 7 ...
+;window,  0
+;plot, xy_coords[*,0], xy_coords[*,1], psym=3, xrange=[-5,5], yrange=[-5,5]
+;xyouts, xy_coords[*,0], xy_coords[*,1], indgen(6)
+;ch0 =0 ;Close hole 0
+;if (subarr eq 'a') then ch1 =1 $
+;else if (subarr eq 'b') then begin 
+;  ch1 =0 
+  ;!!! Maybe this array is a little off for the Feb05 Run.
+  ;Could also just be tilts for the data sets I looked at.
+;endif else if (subarr eq 'c') then ch1 =2 $
+;else if (subarr eq 'd') then ch1 =4  ;1,0,2,4
+;inc = (xy_coords[ch1,*]-xy_coords[ch0,*])/9. ;Shift these holes apart slightly...
+;xy_coords[ch0,*] = xy_coords[ch0,*] - inc
+;xy_coords[ch1,*] = xy_coords[ch1,*] + inc
+;oplot, xy_coords[*,0], xy_coords[*,1], psym=4
+;window,  1
+;xy_coords=xy_coords[1:*,*] ;for pattern 6d
+
+
+
+;----------------------------------------------------------
+;Coordinate hacks here...
+msk_rot=0.0 & scale=1.0
+
+if (instrument eq 'nirc2' or instrument eq 'lws') then $
+ xy_coords[*,0] = -xy_coords[*,0];for nirc2 and lws, the x-axis is backwards
+if (instrument eq 'pharo') then xy_coords = xy_coords - 3.0 ;For Palomar I think
+if (maskname eq  'p18') then begin
+ scale =  0.94
+ msk_rot =  -25.0*!pi/180.0
+endif else if (maskname eq  'p9') then begin
+ scale =  0.95 ;Changed on August 2 to match CH4S
+ msk_rot =  -10.0*!pi/180.0
+endif else if (maskname eq  '14h_Sep03') then begin
+ scale =  0.99
+ msk_rot = 0.0
+endif else if (maskname eq 't7') then begin
+ scale =  1.0
+ msk_rot =  -14.*!pi/180 ;!!! Needs to be better calibrated... (was 42)
+endif else if (maskname eq '9Holes') then begin
+ scale =  1.0
+ msk_rot = 4.5*!pi/180
+endif else if (maskname eq 'g7s2' or maskname eq 'g7s6') then begin
+ scale =  0.935
+endif else begin
+ scale =  1.0
+ msk_rot =  0.0
+endelse
+
+print,'Hacking the scale'
+scale = 0.98
+
+;msk_rot=0.025 ;For May03 nirc data
+if (instrument eq 'lws') then msk_rot=2*!pi/180. ;Change this for LWS testing
+
+if (instrument eq 'conica') then begin
+    xy_coords[*,0] = -xy_coords[*,0] ; X-axis flip
+    ;if (maskname eq '7Holes') then msk_rot=4*!pi/180
+    if (maskname eq '7Holes') then msk_rot=0.013+0*!pi/180 ;;ACC T Cha march '10-'13
+endif
+
+if (instrument eq 'jwst') then begin
+  msk_rot = -!pi/2
+  xy_coords[*, 0] *=  -1
+endif
+
+if instrument eq 'gpi' then begin
+   xy_coords[*,0]*=-1 ;;flip the mask and ims so E is ccw of N
+   special=''
+   xy_coords*=0.99
+endif
+
+rot1=[[cos(msk_rot),sin(msk_rot)],[-sin(msk_rot),cos(msk_rot)]]
+xy_coords = scale*rot1##xy_coords
+;----------------------------------------------------------
+
+;----------------------------------------------------------
+n_wavs=1
+pol=0
+wav_file = ''
+;;---- GPI ------
+;;14.14mas/pix (assuming known plate scale and unknown wavs)
+; filter = [1.045e-6,0.1950e-6] & filname = 'Y' & n_wavs=37 ;
+;filter = [1.232e-6,0.2356e-6] & filname = 'J' & n_wavs=37 ;
+;filter = [1.646e-6,0.3028e-6] & filname = 'H' & n_wavs=37 ;
+; filter = [2.041e-6,0.3090e-6] & filname = 'K1' & n_wavs=37 ;
+;filter = [2.252e-6,0.2890e-6] & filname = 'K2' & n_wavs=37 ;
+;;---- SPHERE-IRDIS ------
+; filter=[1.62715e-6,0.0763e-6]  & filname='D_H23' & n_wavs=2 ;; H23 filter. Each channel is ~55nm wide.
+; offs=0.01e-6 & filter=[1.627826e-6+0.5*offs,0.078634e-6+offs]  & filname='D_H23' & n_wavs=2 ;; H23 filter, with a hack to account for the smaller plate scale in H3
+; filter=[2.17875e-6,0.1525e-6]  & filname='D_K12' & n_wavs=2 ;; K12 filter. Each channel is ~100nm wide.
+; filter=[2.17875e-6,0.1525e-6]  & filname='D_K12_Test' & n_wavs=2 ;; K12 filter. Each channel is ~100nm wide.
+; filter = [2.1629e-6,0.0e-6] & filname ='CI_BrG' & n_wavs = 2 ;; BrG filter. Both bands are the same wavelength
+; filter=[2.2875e-6,0.e-6] & filname='CI_N_CO' & n_wavs=2 ;; NB_CO filter. Both bands are the same wavelength
+;;---- SPHERE-IFS ------
+; filter=[1.15e-6,0.3800e-6]  & filname='YJ' & n_wavs=39 & wav_file='sphere/ifs_yj.fits' ;; YJ filter. Each channel is ~55nm wide. But use the actual values in the fits file
+; filter=[1.30e-6,6.9e-7] & filname='YJH' & n_wavs=39 & wav_file='sphere/ifs_yh.fits' ;; YH filter. But use the actual values in the fits file
+filter=[1.30e-6,6.9e-7] & filname='YJH_Test' & n_wavs=39 & wav_file='sphere/ifs_yh.fits' ;; YH filter. But use the actual values in the fits file
+;;---- SPHERE-ZIMPOL ------
+;; Sorry, this is going to be messy due to the number of combinations.
+;;   N_R  = 645.9 +/- 56.7
+;;   N_I  = 816.8 +/- 80.5
+;; Cnt_Ha = 644.9 +/- 4.1
+;;   B_Ha = 655.6 +/- 5.5
+; filter=[(0.8168e-6+0.6459e-6)/2.,0.8168e-6-0.6459e-6] & filname='N_R_N_I' & n_wavs=2 ;
+; filter=[(644.9e-9 + 655.6e-9)/2.,(644.9e-9 - 655.6e-9)] & filname='B_Ha_CntHa' & n_wavs=2 & pol=1
+; filter=[(644.9e-9 + 655.6e-9)/2.,(644.9e-9 - 655.6e-9)] & filname='B_Ha_CntHa' & n_wavs=2
+; filter=[(644.9e-9 + 655.6e-9)/2.,(655.6e-9 - 644.9e-9)] & filname='CntHa_B_Ha' & n_wavs=2
+
+
+; Set up extra filename identifier to distinguish specific configurations (esp. conica)
+special=special+''
+if (instrument eq 'conica') then special='_'+camname+special
+if(chipsz ne 256 and instrument ne 'lws') then special=special+'_'+strtrim(string(chipsz),2) 
+;----------------------------------------------------------
+if keyword_set(pol) then if_pol='_pol' else if_pol=''
+
+savefile = tmpl_root+instrument+'/mf_'+maskname+'_'+filname+if_pol+special+'.idlvar'
+n_l         = 1	 	; number of wavelengths to use to simulate bandwidth
+round_uv_to_pixel = 1   ;round the uv coordinates to the nearest pixel and centre the gain vector there
+;----------------------------------------------------------
+;Automatic from here
+;----------------------------------------------------------
+n_holes = (size(xy_coords))[1]
+
+; Generate index arrays for bispectrum etc from n_holes
+index_mask,n_holes,n_baselines,n_bispect,n_cov, $
+           h2bl_ix,bl2h_ix,bs2bl_ix,bl2bs_ix,bscov2bs_ix
+
+u = dblarr(n_baselines,n_wavs)
+v = dblarr(n_baselines,n_wavs)
+u_ideal = dblarr(n_baselines,n_wavs)
+v_ideal = dblarr(n_baselines,n_wavs)
+sum=long(0)
+mf_ix=lonarr(2,n_baselines,n_wavs)
+ix_count=0l
+
+if not keyword_set(n_wavs) then stop ;;This filter does not have multiple wavelength channels! Use the normal version of make_tmpl.script!
+if wav_file eq '' then begin
+    lambdas=filter[0]+filter[1]*(findgen(n_wavs)/(n_wavs-1) - 0.5)
+endif else begin
+    lambdas = readfits(tmpl_root+wav_file)
+    ;; and check that the wavelengths are right
+    if lambdas[0] gt 0.1 then lambdas*=1e-6
+endelse
+; stop
+
+; if pol eq 1 then stop ;;this doesnt work yet
+;-------------------------------------------------------------------------------------------------
+; Uncomment this Temporary stuff to make up a simulated power spectrum for comparison
+;pupilsz=8.0 & sgrain=.01
+;mask=make_mask(tmpl_root+'/vampires/info_9h.idlvar',pupilsz,nint(pupilsz/sgrain),hole_diam,m_ix=m_ix,m_pvct=m_pvct)
+;im=getim(mask,n_l,filter[0],filter[0],rad_pixel,pupilsz,256)
+;  pspc=abs(fft(im)^2)
+;sampledisk=7.7
+;dummy=fltarr(chipsz,chipsz)
+;cookiecutter,dummy,nint((f_cov[0,*,*]/filter[0]*rad_pixel*chipsz+128)[*]),nint((f_cov[1,*,*]/filter[0]*rad_pixel*chipsz+128)[*]),sampledisk
+;
+; image_cont,shift(pspc,128,128)^.2+dummy/1e4,/nocont,/asp
+;-------------------------------------------------------------------------------------------------
+
+;; come up with a set of baselines that are all rounded to the nearest pixel and close, by forcing the xy coords to a grid.
+if round_uv_to_pixel then begin
+
+   for wav=0,n_wavs-1 do begin
+      lambda=lambdas[wav]
+
+      ;;work out ideal placement
+      for bl=0,n_baselines-1 do begin
+         u_ideal[bl,wav] = (xy_coords[bl2h_ix[0,bl],0] - xy_coords[bl2h_ix[1,bl],0])/lambda
+         v_ideal[bl,wav] = -(xy_coords[bl2h_ix[0,bl],1] - xy_coords[bl2h_ix[1,bl],1])/lambda
+   endfor
+   
+      onepix=1./(chipsz*rad_pixel)
+      onepix_xy=onepix*lambda
+      
+      ;;round the xy coords to the nearest "pixel" and calculate the new uv coords
+      new_xy=nint(xy_coords/onepix_xy)*onepix_xy
+      for bl=0,n_baselines-1 do begin
+         u[bl,wav] = (new_xy[bl2h_ix[0,bl],0] - new_xy[bl2h_ix[1,bl],0])/lambda
+         v[bl,wav] = -(new_xy[bl2h_ix[0,bl],1] - new_xy[bl2h_ix[1,bl],1])/lambda
+      endfor
+   endfor
+endif else begin
+   for wav=0,n_wavs-1 do begin
+      lambda=lambdas[wav]
+      
+      for bl=0,n_baselines-1 do begin
+         u[bl,wav] = (xy_coords[bl2h_ix[0,bl],0] - xy_coords[bl2h_ix[1,bl],0])/lambda
+         v[bl,wav] = -(xy_coords[bl2h_ix[0,bl],1] - xy_coords[bl2h_ix[1,bl],1])/lambda
+      endfor
+      u_ideal=u
+      v_ideal=v
+   endfor
+endelse
+
+;;rather than have different closing triangles for each wavelength, do it once for the central wavelength
+
+;; Firstly work out sizes of splodges
+;; This is the size of the Gaussian for the match filter...
+lambda=lambdas[n_wavs/2]
+splodge_fwhm = hole_diam/lambda*rad_pixel*chipsz/1.9 ;! factor of 1.9 empirical best fit gaussian-to-actual-splodge (see gauss_fit_splodge.script)
+
+;; To find the size of the sample circle, firstly find minimum baseline
+minbl = min(b_lengths(where(b_lengths gt 0.0)))
+if n_holes ge 15 then $
+   sampledisk_r=minbl/2/lambda* rad_pixel * chipsz * .9 $
+else $
+   sampledisk_r=minbl/2/lambda* rad_pixel * chipsz * .6 ; use a smaller spot for few-hole-masks (still allows lots of slop for peak)
+
+sampledisk_r=minbl/2/lambda* rad_pixel * chipsz * .6 ; use a smaller spot for few-hole-masks (still allows lots of slop for peak) ;;ACC changed from 0.8
+; OK now we can work out the 3-vector of pixel triangles that identify
+; all closing subsets of 3 pixels in pwr spectrum space 
+closing_tri_pix=tri_pix(chipsz,sampledisk_r)
+
+print,'Calculating sampling of ',n_holes,' hole array' 
+for wav=0,n_wavs-1 do begin
+   print,'Up to wavelength:',wav+1,' of',n_wavs
+   lambda=lambdas[wav]
+
+; Loop over baselines and wavelengths filling in mf_ix, mf_pvct and mf_gvct
+   for i = 0,n_baselines - 1 do begin
+
+      mf=dblarr(chipsz,chipsz)
+      thisholepair=bl2h_ix[*,i]
+      
+      ;;The conventiona for u,v are different from the conventions for the matched filter. The u,v coordinates are flipped in the y direction compared to the matched filter (hence the lack of the -1 in yspot)
+      xspot=u[i,wav]*rad_pixel*chipsz+chipsz/2
+      yspot=-v[i,wav]*rad_pixel*chipsz+chipsz/2
+      
+      xspot_int=nint(xspot)
+      yspot_int=nint(yspot)
+
+      ;;and just to make sure,
+      if round_uv_to_pixel then xspot=double(xspot_int)
+      if round_uv_to_pixel then yspot=double(yspot_int)
+
+      cookiecutter,mf,xspot_int,yspot_int,sampledisk_r
+      thisspot_c=where(mf gt 0)                                                            ; we make up 2 samplings. This 'c' one is centered at [chipsz/2,chipsz/2]
+      thisspot_z=where(shift(mf,-chipsz/2,-chipsz/2) gt 0)                                 ; This 'z' one is centered at [0,0] like before
+      if (wav eq 0) and (i eq 0) then mf_pvct=thisspot_z else mf_pvct=[mf_pvct,thisspot_z] ; this mf_pvct is centered at [0,0]
+      if (wav eq 0) and (i eq 0) then mfc_pvct=thisspot_c else mfc_pvct=[mfc_pvct,thisspot_c] ; this mfc_pvct is centered at [chipsz/2,chipsz/2]
+      mf_ix[*,i,wav] = [ix_count, ix_count+n_elements(thisspot_c)-1]
+      ix_count+=n_elements(thisspot_c)
+      ;; Now do gaussian matchfilter for gains
+      mfg=gauss_circ(chipsz,[1.,splodge_fwhm,0.0,xspot,yspot])
+      mfg=mfg/total(mfg)
+
+      if (wav eq 0) and(i eq 0) then mfc_gvct=mfg[thisspot_c] else mfc_gvct= [mfc_gvct,mfg[thisspot_c]]
+      if (wav eq 0) and (i eq 0) then mf_gvct= (shift(mfg,-chipsz/2,-chipsz/2))[thisspot_z] else mf_gvct= [mf_gvct,(shift(mfg,-chipsz/2,-chipsz/2))[thisspot_z]]
+   endfor
+endfor   
+   
+; Below here are Mike's rmat and imat overlap matrices. 
+; I think they are supposed to account for overlapping splodge power.
+; As normally (universally) run, I think these end up being arrays of 0's and 1's
+; and so this is never used, except to add some pointless cpu cycles
+   
+;holes = fltarr(arraysz,arraysz,n_holes,n_l)
+mf = fltarr(chipsz,chipsz,n_baselines)
+mf_conj = fltarr(chipsz,chipsz,n_baselines)
+mf_rmat = fltarr(n_baselines,n_baselines,n_wavs)
+mf_imat = fltarr(n_baselines,n_baselines,n_wavs)
+print, 'Finding Vis to Measurement matrices...'
+for wav=0,n_wavs-1 do begin
+   lambda=lambdas[wav]
+;Now fill-in the huge matched-filter cube (to be released later)
+   for i = 0,n_baselines-1 do begin
+      mf_temp = fltarr(chipsz,chipsz)
+      mf_temp[mf_pvct[mf_ix(0,i,wav):mf_ix(1,i,wav)]]  = mf_gvct[mf_ix(0,i,wav):mf_ix(1,i,wav)] 
+      mf[*,*,i] = mf_temp
+      mf_conj[*,*,i] = shift(rotate(mf_temp,2),1,1)
+                                ;Make sure these are normalised for the purposes of the overlap matrices...
+      norm = sqrt(total(mf[*,*,i]^2))
+      mf[*,*,i] = mf[*,*,i]/norm
+      mf_conj[*,*,i] = mf_conj[*,*,i]/norm
+   endfor
+   test =  total(mf,3) - total(mf_conj,3)
+   samp = fltarr(chipsz,chipsz)
+   samp(mf_pvct)=max(test)/3.
+   if (wav eq 0) or (wav eq n_wavs-1) then image_cont, shift(test+samp,chipsz/2,chipsz/2), /nocont, /asp
+   
+;Now find the overlap matrices
+   for i = 0,n_baselines-1 do begin
+      in = where(mf[*,*,i] ne 0.0)
+      for j = 0,n_baselines-1 do begin
+         t1 = total((mf[*,*,i])[in]*(mf[*,*,j])[in])
+         t2 = total((mf[*,*,i])[in]*(mf_conj[*,*,j])[in])
+         mf_rmat[i,j,wav] = t1 + t2
+         mf_imat[i,j,wav] = t1 - t2
+      endfor
+   endfor
+;This next big is for diagnostics...
+   mf_tot = total(mf,3) + total(mf_conj,3)
+   w = where(mf_tot eq 0)
+   mask = fltarr(256,256)
+   mask[w] = 1.0
+
+   ;print, 'Inverting Matrices'
+   mf_rmat[*,*,wav] = invert(mf_rmat[*,*,wav])
+   mf_imat[*,*,wav] = invert(mf_imat[*,*,wav])
+   mf_rmat(where(mf_rmat lt 1e-6)) = 0.0
+   mf_imat(where(mf_imat lt 1e-6)) = 0.0
+   mf_rmat = mf_rmat < 2.0      ;This much overlap will produce artifacts...
+   mf_imat = mf_imat < 2.0 
+   mf_imat = mf_imat > (-2.0)
+endfor
+;We can release the giant cubes now...
+mf = 0
+mf_conj = 0
+
+; Detailed listing of variables saved in match filter file:
+
+; n_holes         - number of holes in the array
+; n_baselines
+; n_bispect
+; n_cov
+; h2bl_ix         - holes to baselines index
+; bs2bl_ix        - bispectrum to baselines index
+; bl2bs_ix        - baselines to bispectrum index
+; bscov2bs_ix     - bispectrum covariance to bispectrum index
+; closing_tri_pix - large 3 X Nclppx vector which addresses all triangles of closing pixles
+; mfc_pvct        - pixelvector of power splodges, but this one centered on chipsz/2,chipsz/2
+
+save, mf_pvct, mf_gvct, mf_ix, mf_rmat, mf_imat, bl2h_ix, h2bl_ix ,bl2bs_ix , $
+  bs2bl_ix, bscov2bs_ix,u,v, filter,n_holes, n_baselines, n_bispect, n_cov, hole_diam, $
+  rad_pixel, filter, mfc_pvct, mfc_gvct, closing_tri_pix, xy_coords, u_ideal,v_ideal, filename = savefile
+
+print,'Saved template to file ',savefile
+
+
+end

@@ -1,0 +1,35 @@
+;; Example script to process SPHERE IRDIS DBI/CI data through pipeline. 
+;; Will produce oifits files.
+
+save_dir='~/data/sphere_data/HIP73990_SAM/IRDIS/Analysis/'
+data_dir='~/data/sphere_data/HIP73990_SAM/IRDIS/Raw/'
+prefix='SPHERE_IRDIFS_IRDIS_OBS137_'
+
+frames=365+findgen(5) ;;the numbers at the end of your data
+tsize=[0.01+fltarr(5)] ;; files with the same number will be processed together, negative numbers note targets
+
+;; Things that you shouldnt need to touch
+jobname='' ;;just a name thats added to the files
+extn='.fits'
+discard_sigma=[-2.,-2.,5.,-3.6,-0.7] ;;Some limits for automatic file rejection. Negative numbers mean no rejection. 
+                                     ;;The way that these work hasn't been tuned for SPHERE, so you will have to remove 
+                                     ;;files by hand for now.
+
+;;!!!!!!!!!!!!!
+;;AUTOMATIC BELOW HERE
+;;!!!!!!!!!!!!!
+
+;;neither of these are needed in qbe_gpi (since they are done in the GPI pipeline)
+flatpath=''
+skies=0
+
+cd,save_dir
+
+;;cube the data
+qbe_sphere,data_dir, jobname, flatpath, frames,skies, tsize,extn=extn,prefix=prefix,cutsize=256,discard_sigma=discard_sigma,/centre_once_per_cube
+;;get the visibilities and closure phases
+; calc_bispect_gpi, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/"
+;;calibrate the data
+; calibrate_v2_cp_gpi,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/',/skip_cp_rejection,/no_cp_rejection,/cal4src
+
+end

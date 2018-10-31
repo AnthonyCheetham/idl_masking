@@ -1,0 +1,98 @@
+;header_gpi.script
+;
+; This pulls useful infromation from the headers of a set of
+; GPI data files. This version still under construction
+;
+
+data_dir='~/data/gpi_data/NRM/2016-05-03_polz/Raw/'
+save_dir='~/data/gpi_data/NRM/2016-05-03_polz/'
+output_file=save_dir+'header_all.txt'
+
+
+
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; Everything below here is automatic
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+file=findfile(data_dir+'*.fits*')
+
+;; object, date, time, obs mode, prism, pa, hwp, hwp in, apodizer
+s_par=['OBJECT','DATE','UT','OBSMODE','DISPERSR','PAR_ANG','WPANGLE','WPSTATE','APODIZER']
+;; RA, DEC
+n_par=['RA','DEC']
+;;integration time, # coadds
+n2_par=['ITIME','COADDS']
+
+firstline=' IX  File#ID             Object     TIME          RA          DEC        MODE   DISPERSER   MASK   T_int Coadds PupilRot  HWPlt'
+if (keyword_set(datadir) eq 0) then datadir="./"
+n_files=n_elements(file)
+spars=n_elements(s_par)
+npars=n_elements(n_par)
+n2pars=n_elements(n2_par)
+
+s_output=strarr(spars,n_files)
+n_output=fltarr(npars,n_files)
+n2_output=fltarr(n2pars,n_files)
+
+for i=0,n_files-1 do begin
+   filename=file(i)
+   head=headfits(filename)
+   head2=headfits(filename,ext=1)
+
+   for j=0,n_elements(s_par)-1 do begin
+      s_output(j,i)=sxpar(head,s_par(j))
+   endfor
+   
+   for j=0,n_elements(n_par)-1 do begin
+      n_output(j,i)=sxpar(head,n_par(j))
+   endfor
+
+   for j=0,n_elements(n2_par)-1 do begin
+      n2_output(j,i)=sxpar(head2,n2_par(j))
+   endfor
+endfor
+
+; Now do pretty tabular output of numbers
+; Trim the string array
+s_output=strcompress(strtrim(s_output,2))
+
+openw,unit,output_file,/get_lun
+printf,unit,firstline
+
+last_s_params=replicate('starter',6)
+last_n_params=replicate(0.,3)
+last_pos=[0.,0.]
+blockno=-1
+
+for i=0,n_files-1 do begin
+
+   ;; *** find file identifier/number ***
+   pos=strpos(file[i],'.fits')
+   file_num=strmid(file[i],pos-14,9)+''+strmid(file[i],pos-5,5)
+
+   ;; Trim the timestamp information:
+   redtime=strmid(s_output(2,i),0,8)
+   
+   ;; clean the hwp angle and disperser
+   if s_output[7,i] eq 'OUT' then s_output[6,i]=''
+   if s_output[4,i] eq 'DISP_WOLLASTON_G6261' then s_output[4,i]='WOLLASTON'
+   if s_output[4,i] eq 'DISP_PRISM_G6262' then s_output[4,i]='PRISM'
+   
+   ;; clean the apodizer output
+   if s_output[8,i] eq 'APOD_NRM_G6208' then s_output[8,i]='NRM'
+   if s_output[8,i] eq 'APOD_CLEAR_G6201' then s_output[8,i]='CLEAR'
+   
+   ra=15./60/60 & dec=1./60/60
+   blockno+=1
+   
+   ;;write to file
+   format="(I3,' ',A14,' ',A15,' ',A10,' ',A22,' ',A10,' ',A9,' ',A6,' ',F6.1,' ',F4.1,'    ',A6,'   ',I3)"
+   ;format=''
+   ;;filename, object, time, RA, DEC, mode, apodizer, itime, coadds, hwp
+   ;print,i,file_num,s_output(0,i),redtime,s_output[1,i],adstring(n_output[0,i],n_output[1,i]),s_output(3,i),s_output[8,i],n2_output(0:1,i),s_output[6,i], format=format
+   printf,unit,i,file_num,s_output(0,i),redtime,adstring(n_output[0,i],n_output[1,i]),s_output(3,i),s_output[4,i],s_output[8,i],n2_output(0:1,i),s_output[5,i],s_output[6,i], format=format
+endfor
+
+close,unit
+
+end
+ 

@@ -1,0 +1,42 @@
+;;script to process GPI data through pipeline. This is an example of a script that can be used as a template.
+jobname='_scndlight'
+data_dir='~/data/GPI_scndlight/131211/'
+;extn='.fits'
+;spawn,'ls '+data_dir+'*'+extn,files
+prefix='S20131211S' 
+
+save_dir='~/code/GPI/scndlight_processed_pix/'
+cd,save_dir
+
+tsize=[fltarr(8)-0.01,fltarr(8)+0.02,fltarr(8)+0.03] ;;-ve = targ
+skies=0;; ??
+flatpath='~/code/GPI/dummy_flat.idlvar'
+
+;flat=1+fltarr(281,281) & bad_pixels=[0] & save,flat,bad_pixels,file=flatpath
+
+;;first, qbe
+;;HR2690	S0084-91
+;;HR2716	S0092-99
+;;HR2839	S0101-108
+frames=[84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,102,103,104,105,106,107,108] ;; all H band
+;qbe_gpi,data_dir, jobname, flatpath, frames,skies, tsize,wav_channel=0,extn='_spdc.fits',prefix=prefix,cutsize=256;,izero
+mf_name='gpi/mf_g10s40_H_256.idlvar'
+mf_name='gpi/mf_g10s40_H_pix.idlvar'
+
+!except=0
+;calc_bispect_gpi, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/",mf_file=mf_name;,/disp_windowing
+;calibrate_v2_cp_gpi,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/',/cal4src,/skip_cp_rejection
+;;note that i should change the skip_cp_rejection back to accepting the limits when I am done
+
+;oif='~/code/GPI/scndlight_processed/HR_2716__0001.oifits' ;;no cp cutoff
+;oif='~/code/GPI/scndlight_processed/HR_2690__0000mrg.oifits' ;; no cp cutoff
+;oif='~/code/GPI/scndlight_processed/T1_wav35_mrg.oifits' ;;cp cutoff
+
+;oif='~/code/GPI/scndlight_processed_pix/oifits/C1.oifits'
+oif='~/code/GPI/scndlight_processed_pix/oifits/T1.oifits'
+binary_grid,oif,nsim=long(10000),init_crat=5.,/nosave,/nosim
+
+;read_oidata,oif, oiarray, oitarget,oiwavelength,oivis,oivis2, oit3
+
+
+end

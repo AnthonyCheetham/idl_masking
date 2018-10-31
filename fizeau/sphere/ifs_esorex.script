@@ -1,0 +1,8 @@
+;;This program will run esorex on the raw IFS data (hopefully)
+;;Need to run: sph_ifs_science_dr (assuming all of the cal files are made properly.)
+;;      
+;;commands look like:
+;; esorex sph_ifs_science_dr test.sof
+
+
+end

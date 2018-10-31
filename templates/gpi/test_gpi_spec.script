@@ -1,0 +1,31 @@
+dir='~/code/gpi_pipeline/pipeline/config/filters/'
+
+band='K2'
+
+file=dir+'GPI-filter-'+band+'.fits'
+
+if band eq 'Y' then begin
+   filter = [1.045e-6,0.1950e-6]
+endif else if band eq 'J' then begin   
+   filter = [1.232e-6,0.2356e-6]
+endif else if band eq 'H' then begin
+   filter = [1.646e-6,0.3028e-6]
+endif else if band eq 'K1' then begin
+   filter = [2.041e-6,0.3090e-6]
+endif else if band eq 'K2' then begin
+   filter = [2.252e-6,0.2890e-6]
+endif
+
+n_wavs=37
+
+fxbopen,unit,file,1
+fxbreadm,unit,[1,2],wav,trans
+plot,wav,trans,xtitle='Wavelength (microns)',ytitle='Transmission'
+
+lambdas=filter[0]+filter[1]*(findgen(n_wavs)/(n_wavs-1) - 0.5)
+for i=0,n_wavs-1 do begin
+   diff=abs(wav-lambdas[i]*1e6)
+   w=where(diff eq min(diff))
+   oplot,[wav[w],-10],[trans[w],-10],psym=5,color=100
+endfor
+end

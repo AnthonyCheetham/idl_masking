@@ -1,0 +1,59 @@
+;;make the GPI mask info file;
+;;Need:
+;;     xy_coords
+;;     f_cov
+;;     b_lengths
+;;     b_angles
+
+name='golay9'
+dir='~/code/masking/templates/simu/'
+rot=0. ;;rotation angle
+extra_scal=1.00
+;;of form: [[x,x,x,x,x,x,x,x],[y,y,y,y,y,y,y,y]]
+xy_coords=[[-2.07,2.07, -1.38,-3.45,2.07,3.45,-0.69,-1.38,1.38],[-2.79,-2.79,-1.59,-0.398,-0.398,-0.398,1.99,3.19,3.19]]
+mirrorsz=8.;;m (including baffling "to mask off a poor-quality edge" [Anand])
+
+;;rotate, flip and scale mask:
+;xy_coords=[[xy_coords[*,1]],[xy_coords[*,0]]]
+;xy_coords[*,1]*=-1
+xy_coords*=extra_scal ;;also converts to metres
+
+n_holes=n_elements(xy_coords)/2
+;;get arrays ready:
+f_cov=fltarr(2,n_holes,n_holes)
+b_lengths=fltarr(n_holes,n_holes)
+b_angles=b_lengths
+
+for i=0,n_holes-1 do begin
+    this_xy=xy_coords[i,*]
+
+    for j=0,n_holes -1 do begin
+        new_xy=xy_coords[j,*]
+        
+        ;;f_cov is the distances between holes:
+        f_cov[*,j,i]=new_xy-this_xy
+        
+        ;;baseline length
+        b_lengths[j,i]=sqrt(total((new_xy-this_xy)^2))
+        
+        ;;baseline angle:
+        if i eq j then b_angles[j,i]=0 else begin
+            ang=atan((new_xy[1]-this_xy[1])/(new_xy[0]-this_xy[0]))
+            if j gt i then ang=ang+!dpi
+            b_angles[j,i]= ang
+        endelse
+    endfor
+endfor
+outname=dir+'info_'+name+'.idlvar'
+save,xy_coords,f_cov,b_lengths,b_angles,filename=outname
+;print,'Saved as: ',outname
+;;for testing:
+;xy_coords2=xy_coords
+;f_cov2=f_cov
+;b_lengths2=b_lengths
+;b_angles2=b_angles
+
+;restore,'~/code/masking/templates/conica/info_g7.idlvar'
+
+end
+

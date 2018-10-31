@@ -1,0 +1,265 @@
+sz=256
+sz_str=strcompress(string(sz),/remove_all)
+
+dir='/media/anthony/Cheetham_ext/fake_data/alexey_test/science_'+sz_str+'/'
+!except=0
+files=['n0000','n0001']+'.fits'
+jobname=''
+
+mf='simu/mf_g18_Kp.idlvar'
+if sz eq 512 then mf='simu/mf_g18_Kp_512.idlvar'
+if sz eq 513 then mf='simu/mf_g18_Kp_513.idlvar'
+if sz eq 1024 then mf='simu/mf_g18_Kp_1024.idlvar'
+;params=[sqrt(2.d)*27.d*3.d,-45.0d,5.d,1e-4,1e-4]
+params=[135d,0.,5.,1e-5,1e-5]
+;mf='simu/mf_g18_old_way.idlvar'
+window_mult=1.
+
+resave=0
+redo_bispect=0
+redo_calibrate=0
+redo_binary_grid=0
+
+re_extract=0 ;;extract oifits?
+
+correlation_plot=0 ;;model vs measured
+hist_plot=0 ;; histogram of measured values
+mod_plot=0 ;; model vs (model - measured) for calibrated target data.
+mod_plot2=1 ;; model vs (model - measured) for raw clps, target and cal
+look_at_ft=0 ;;shows phase
+measure_from_ft=1
+print_chi2=0
+
+if redo_calibrate then re_extract=1
+
+save_dir='/media/anthony/Cheetham_ext/fake_data/alexey_test/processed_'+sz_str+'/'
+cd,save_dir
+
+oif=save_dir+'Fake_0000mrg.oifits'
+
+outsz=sz
+tsize=[0.01,-0.02]
+if resave then begin
+
+   n=n_elements(files)
+   olog=make_olog(n,tsize,files,0)
+
+   for i=0,n-1 do begin
+      im=readfits(dir+files[i],head)
+      sz=(size(im))[1]
+      nf=(size(im))[3]
+      ;;cut down image
+      im=im[sz/2.-outsz/2.:sz/2.+outsz/2.-1,sz/2.-outsz/2.:sz/2.+outsz/2.-1,*]
+
+      im=im>0
+      ;;hack! shift image
+      am=0.
+      ;im=shift(im,am)
+      for frame=0,nf-1 do im[*,*,frame]=(acc_fftshift(im[*,*,frame],[am,0]))
+
+      ;;make cubeinfo
+      this=freud(head,ix=0,olog=olog)
+      ;filestring='0000'
+      filestring=string(i,format='(I04)')
+      filename='cube'+filestring+'.fits'
+      olog.cube_fname[i,0]=filename
+      olog.cube_fname[i,1]=filestring
+      save,olog,file='cubeinfo'+jobname+'.idlvar'
+      ;;save
+      writefits,'cube'+filestring+'.fits',im
+   endfor
+endif
+
+!p.multi=0
+if redo_bispect then calc_bispect,save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/",mf_file=mf,window_mult=window_mult
+
+if redo_calibrate then calibrate_v2_cp,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/',/skip_cp_rejection,/skip_baseline_rejection,cal4src=[[0,1],[0,0]]
+
+if redo_binary_grid then binary_grid,oif,init_crat=params[2],/nosim
+if re_extract then  extract_t3data,t3data,file=oif
+!p.multi=0
+
+if correlation_plot then begin
+
+   ;;calculate the binary model
+   mod_t3=binary_t3data(params,t3data=t3data)
+   mod_cps=mod_t3.t3phi
+   cps=t3data.t3phi
+   cps=(cps + 180) mod 360 -180
+   cps=(cps - 180) mod 360 +180
+   
+   ploterr,mod_cps,cps,cp_sig,psym=5
+   oplot,[-1e5,1e5],[-1e5,1e5],color=100
+endif
+
+if hist_plot then begin
+   cp_all=atan(bs_all,/phase)*180/!dpi
+   bin=1.0
+   plothist,cp_all[*,i],bin=bin,/peak
+   
+   err=cp_sig[i]*180/!dpi
+   
+   ;gaus
+   n=1000
+   x=2*(findgen(n)/(n-1)-0.5)*8
+   gaus=exp(-(x-bin/2.)^2/(2*(err*sqrt(500))^2))
+
+   oplot,x,gaus,color=100
+   print,err,(sqrt(moment(cp_all[*,i])))[1]/sqrt(500)
+   print,cp[i]*180/!dpi,(moment(cp_all[*,i]))[0]
+endif
+
+if mod_plot then begin
+   wset,1
+   mt3=binary_t3data(params,t3data=t3data)
+
+   ploterr,mt3.t3phi,(t3data.t3phi-mt3.t3phi),t3data.t3phierr,psym=5,ytitle='Difference from model',xtitle='Model cp'
+   ;oplot,[-50,50],[-50,50],color=100
+   oplot,[-50,50],[0,0],color=100
+   wset,0
+endif
+
+if mod_plot2 then begin
+   wset,1
+   restore,'bs0000.idlvar'
+   cp_bin=cp*180/!dpi
+   cp_err_bin=180*cp_sig/!dpi
+
+   restore,'bs0001.idlvar'
+   cp_cal=cp*180/!dpi
+   cp_err_cal=180*cp_sig/!dpi
+
+   mt3=binary_t3data(params,t3data=t3data)
+   cp_mod=mt3.t3phi
+
+   resid=mod360(cp_bin-cp_mod)
+
+   ploterr,cp_mod,resid,cp_err_bin,psym=5,yr=[-2,2],xtitle='Model CLP',ytitle='Difference from model (deg)',charsize=1.5
+   oploterr,cp_mod,cp_cal,cp_err_cal,psym=5,color=50
+   oplot,[-50,50],[0,0],color=100
+   wset,0
+endif
+
+if print_chi2 then begin
+   mt3=binary_t3data(params,t3data=t3data)
+   chi2=total((t3data.t3phi-mt3.t3phi)^2/(t3data.t3phierr^2))
+   print,'Chi2    :',chi2
+   print,'Chi2_red:',chi2/n_elements(t3data.t3phi)
+endif
+
+if measure_from_ft then begin
+   file='0'
+   im=readfits('cube000'+file+'.fits')
+   frame=0
+   ft=shiftfft(im[*,*,frame],/reverse)
+
+   ph=atan(ft,/phase)
+
+   restore,'~/code/masking/templates/'+mf
+   image_cont,ph,/n,/a
+
+   ;;find the pixels for a triangle:
+   ctp=closing_tri_pix
+   ntp=(size(ctp))[2]
+   n_closing_tri=ntp
+   pix=reform(array_indices(ph,ctp),[2,3,ntp])
+
+   cps=dblarr(n_bispect)
+
+   ;;the bispect way:
+   mfilter_spec=dblarr(sz,sz)
+   mfilter_spec[mfc_pvct]=mfc_gvct
+   mfilter_spec+=shift(reverse(reverse(mfilter_spec),2),1,1)
+   mfilter_spec = mfilter_spec * ft/abs(ft)
+   image_cont,mfilter_spec,/n,/a
+   for bs_ix=0,n_bispect-1 do begin
+      
+      bl1=bs2bl_ix[0,bs_ix]
+      bl2=bs2bl_ix[1,bs_ix]
+      bl3=bs2bl_ix[2,bs_ix]
+      
+      pix1=[u[bl1],-v[bl1]]*sz*rad_pixel+sz/2
+      pix2=[u[bl2],-v[bl2]]*sz*rad_pixel+sz/2
+      pix3=-[u[bl3],-v[bl3]]*sz*rad_pixel+sz/2
+
+      use_tripix=1
+      peters_way=1
+      fixed_way=1
+
+      base_origin=closing_tri_pix[0,0]
+
+      if use_tripix then begin
+         this_bs=bs_ix
+         
+         this_tri=bs2bl_ix[*,this_bs]
+         tri_splodge_origin = mfc_pvct[mf_ix[0,this_tri]]
+         splodge_shift= tri_splodge_origin - base_origin
+
+         this_trisampling = closing_tri_pix + transpose(splodge_shift##(replicate(1,n_closing_tri)))
+         if fixed_way then begin
+            ;;shift to the negative without reversing the pix
+            spl_offset=array_indices(ft,(splodge_shift+(long(sz/2)*(sz+1))))-128
+
+            this_trisampling[2,*]=this_trisampling[2,*]-2*(spl_offset[0,2]+spl_offset[1,2]*long(sz))
+            ;stop
+         endif
+
+         bs_arr=mfilter_spec[this_trisampling]
+
+         bs_arr2 = reform(bs_arr[0,*]*bs_arr[1,*]*conj(bs_arr[2,*]))
+         if fixed_way then          bs_arr2 = reform(bs_arr[0,*]*bs_arr[1,*]*bs_arr[2,*])
+         
+         offs1= [u[bl1],-v[bl1]]*sz*rad_pixel
+         offs2= [u[bl2],-v[bl2]]*sz*rad_pixel
+         offs3= [u[bl3],-v[bl3]]*sz*rad_pixel
+         if fixed_way then offs3= -[u[bl3],-v[bl3]]*sz*rad_pixel ;;note the -
+
+         these_pix=pix
+         these_pix[0,0,*]+=offs1[0]
+         these_pix[0,1,*]+=offs2[0]
+         these_pix[0,2,*]+=offs3[0]
+         these_pix[1,0,*]+=offs1[1]
+         these_pix[1,1,*]+=offs2[1]
+         these_pix[1,2,*]+=offs3[1]
+         
+         ;;my way
+         bs_all=mfilter_spec[these_pix[0,*,*],these_pix[1,*,*]]
+         bs_all2=bs_all[*,0,*]*bs_all[*,1,*]*conj(bs_all[*,2,*])
+         if fixed_way then bs_all2=bs_all[*,0,*]*bs_all[*,1,*]*bs_all[*,2,*];; note the lack of conj()
+
+         if not peters_way then ph=(atan(total(bs_all2),/phase)+3*!dpi) mod (2*!dpi) - !dpi
+         if peters_way then ph=(atan(total(bs_arr2),/phase)+3*!dpi) mod (2*!dpi) - !dpi
+         cps[bs_ix]=ph*180/!dpi
+         
+         dummy=fltarr(sz,sz)
+         dummy[these_pix[0,*,*],these_pix[1,*,*]]=1
+         dummy2=fltarr(sz,sz)
+         dummy2[this_trisampling[*,*]]=1
+;image_cont,dummy-dummy2,/n,/a & stop
+         stop
+      endif else begin
+         ph1=ph[pix1[0],pix1[1]]
+         ph2=ph[pix2[0],pix2[1]]
+         ph3=ph[pix3[0],pix3[1]]
+         
+         dummy=fltarr(sz,sz)
+         dummy[pix1[0],pix1[1]]=1
+         dummy[pix2[0],pix2[1]]=1
+         dummy[pix3[0],pix3[1]]=1
+         
+         cps[bs_ix]=(-(ph1+ph2+ph3)*180/!dpi + 720) mod (360)
+      endelse
+   endfor
+
+   cps=((cps+180) mod 360) - 180
+   restore,'bs000'+file+'.idlvar'
+   cp_all=atan(bs_all,/phase)*180/!dpi
+   wset,2
+   ;ploterr,cp_all[frame,*],cps,cp_sig*sqrt(6),psym=5,title=string(randomn(seed)),xtitle='Calibrated clp',ytitle='Measured by hand';,xr=[-0.3,0.3],yr=[-0.3,0.3]
+   ploterr,mt3.t3phi,(mt3.t3phi-cps),cp_sig*sqrt(6),psym=5,title=string(randomn(seed)),xtitle='Model clp',ytitle='Difference (Measured by hand)' ;,xr=[-0.3,0.3],yr=[-0.3,0.3]
+   ;oplot,[-50,50],[-50,50],color=100
+oplot,[-50,50],[0,0],color=100
+   wset,0
+endif
+
+end

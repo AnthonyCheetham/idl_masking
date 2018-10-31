@@ -1,0 +1,165 @@
+;header_sphere.script
+;
+; This pulls useful infromation from the headers of a set of
+; sphere data files. 
+;
+
+data_dir='/Users/cheetham/data/sphere_data/JWST_Cals/IRDIS/Raw/'
+save_dir='//Users/cheetham/data/sphere_data/JWST_Cals/IRDIS/'
+output_file=save_dir+'header_irdis.txt'
+
+
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; Everything below here is automatic
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+file=findfile(data_dir+'/SPHER*.fits*')
+
+;;want: Camera, filename, target name, date, parang, HWPs
+s_par=['ESODETID','ORIGFILE','OOBSNAME','TARGNAME','DATE-OBS','SOPTI7ID']
+;;mask, filter
+irdis_par=['1OPTI1NAME','1OPTI2NAME','S1FILTNAME']
+ifs_par=['OPTI14NAME','2OPTI2NAME','S1FILTNAME']
+zimpol_par=['4OPTI9NAME','3OPTI5NAME','3OPTI6NAME']
+;;want: ra, dec, axis1, axis2, axis3, dit, altitude, parang, derotator posang
+n_par=['RA','DEC','NAXIS1','NAXIS2','NAXIS3','TSEQ1DIT','SOTELALT ','ARANGEND','DAPOSANG']
+
+if (keyword_set(datadir) eq 0) then datadir="./"
+n_files=n_elements(file)
+spars=n_elements(s_par)
+npars=n_elements(n_par)
+epars=n_elements(irdis_par)
+
+s_output=strarr(spars,n_files)
+n_output=fltarr(npars,n_files)
+extra_output=strarr(epars,n_files)
+pos_ang=fltarr(n_files)
+pos_ang_lessPA=fltarr(n_files)
+
+for i=0,n_files-1 do begin
+  filename=file(i)
+  head=headfits(filename)
+
+  ins=sxpar_conica(head,s_par[0])
+  if type(ins) eq 7 then begin
+    if ins eq 'IFS' then this_par=ifs_par else if ins eq 'IRDIS' then this_par=irdis_par else stop ;;unknown setup!
+    this_s_par=s_par
+  endif else begin
+    ins=strcompress(sxpar_conica(head,'ETDEV1ID'),/remove_all)
+    if ins ne 'ZIMPOL' then stop ;;unknown setup!
+    this_par=zimpol_par
+    head1=headfits(filename,ext=1)
+    head2=headfits(filename,ext=2)
+    this_s_par=s_par
+    this_s_par[0]='ETDEV1ID'
+  endelse
+
+  for j=0,n_elements(s_par)-1 do begin
+    s_output(j,i)=strcompress(sxpar_conica(head,this_s_par(j)),/remove_all)
+  endfor
+
+  ;;cal files dont have 'TARGNAME' so use OBJECT instead
+  if s_output(3,i) eq '0' then s_output(3,i)=strcompress(sxpar_conica(head,'OBJECT'),/remove_all)
+
+  for j=0,n_elements(n_par)-1 do begin
+    n_output(j,i)=sxpar_conica(head,n_par(j))
+  endfor
+
+
+  for j=0,epars-1 do begin
+    extra_output(j,i)=strcompress(sxpar_conica(head,this_par(j),nchar=10),/remove_all)
+  endfor
+
+  if ins eq 'ZIMPOL' then begin
+    for j=2,4 do begin
+      n_output(j,i)=sxpar_conica(head1,n_par(j))
+    endfor
+    n_output[5,i]=sxpar_conica(head,'ODETDIT1')
+  endif
+
+  ; Formula for position angle taken from /import/spiral1/snert/code/masking/fizeau/freud.pro
+  rotstart = sxpar_conica(head,'ROTSTART')
+  rotend   = sxpar_conica(head,'BSROTEND')
+  pastart  = sxpar_conica(head,'ANGSTART')
+  paend    = sxpar_conica(head,'ARANGEND')
+  alt      = sxpar_conica(head,'SOTELALT')
+  instrument_offset = 0;; ??
+  pos_ang(i) = (rotstart+rotend)/2.+alt-(180.-(pastart+paend)/2.) + instrument_offset
+  pos_ang_lessPA(i) = (rotstart+rotend)/2.+alt + instrument_offset 
+
+  if (i mod 50) eq 49 then print,'Done',i+1,'of',n_files
+endfor   
+
+; Now do pretty tabular output of numbers
+; Trim the string array
+s_output=strcompress(strtrim(s_output,2))
+
+openw,unit,output_file,/get_lun
+firstline='IX     File#ID            Cam       Target Name         TIME         RA          DEC    Filter    Mask   AX1  AX2 AX3  T_int   PosAng  Alt'
+printf,unit,firstline
+
+last_s_params=replicate('starter',6)
+last_n_params=replicate(0.,3)
+last_pos=[0.,0.]
+blockno=-1
+
+for i=0,n_files-1 do begin
+  ins=s_output[0,i]
+
+   ;; *** find file identifier/number ***
+   pos=strpos(s_output(1,i),'.fits')
+  file_num=strmid(s_output(1,i),pos-18,18)
+
+  ;; Trim the timestamp information:
+  redtime=strmid(s_output(4,i),11,8)
+
+  ;; *** give the filter a nice name
+  if ins eq 'IFS' then begin
+    filter=strsplit(extra_output[1,0],'PRI_',/regex,/extract)
+  endif else if ins eq 'IRDIS' then begin
+    if extra_output[1,i] eq 'P0-90' then begin
+      filter='DPI_'+extra_output[2,i]
+    endif else if extra_output[1,i] eq 'CLEAR' then begin
+      filter='CI_'+extra_output[2,i]
+    endif else begin
+      filter=extra_output[1,i]
+    endelse
+  endif else if ins eq 'ZIMPOL' then begin
+    filter = extra_output(1,i)+'/'+extra_output(2,i)
+  endif
+  
+  ;;camera, targ name, filter, mask
+  these_s_params=[s_output[0,i],s_output[3,i],filter,extra_output[0,i]]
+  ;;NAXIS1, NAXIS2, t_int
+  these_n_params=[n_output[2,i],n_output[3,i],n_output[4,i]]
+  ;;ra, dec
+  these_pos=[n_output[0,i],n_output[1,i]]
+  
+  ;;get the difference in pointing in arcsec (15 is 360deg /24hrs)
+  pos_diff=these_pos-last_pos
+  pos_diff=sqrt((pos_diff[0]*60.*60./15.)^2+(pos_diff[1]*60.*60.)^2)
+  ;fov=float(strsplit(s_output[8,i],'SL',/extract))*n_output[2,i]/1000.  ;;field of view in arcsec
+  
+  ;; If the target name, filter, camera, mask, naxis1, naxis3, t_int are the same as the last file, then dont print it:
+  ;;and also ensure that the difference in telescope pointing is greater than the field of view
+  if total((these_n_params ne last_n_params))+ total((these_s_params ne last_s_params)) gt -2 then begin
+     
+    ;;camera, targ name, filter, mask
+    last_s_params=[s_output[0,i],s_output[3,i],filter,extra_output[0,i]]
+    ;;NAXIS1, NAXIS3, t_int
+    last_n_params=[n_output[2,i],n_output[3,i],n_output[4,i]]
+    ;;ra, dec
+    last_pos=[n_output[0,i],n_output[1,i]]
+    ra=15./60/60 & dec=1./60/60
+    blockno+=1
+     
+     ;;write to file
+    format="(I3,' ',A20,' ',A6,' ',A23,' ',A8,' ',A22,' ',A8,' ',A6,' ',I4,' ',I4,' ',I3,' ',F6.2,' ',F8.2,' ',F6.2)"
+    printf,unit,i,file_num,s_output[0,i],s_output[3,i],redtime,adstring(n_output[0,i],n_output[1,i]),filter, $
+      extra_output[0,i],fix(n_output[2,i]),fix(n_output[3,i]),fix(n_output[4,i]),n_output[5,i],pos_ang[i],n_output[6,i],format=format
+  endif
+endfor
+
+close,unit
+
+end
+ 

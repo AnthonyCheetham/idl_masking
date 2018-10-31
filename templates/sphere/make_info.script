@@ -1,0 +1,91 @@
+;;make the SPHERE mask info files;
+;;Need:
+;;     xy_coords
+;;     f_cov
+;;     b_lengths
+;;     b_angles
+
+;Name   Xmm Ymm
+; H_0 -1.894  3.7179
+; H_1 1.894   3.7179
+; H_2 -3.788  0.4374
+; H_3 -1.894  -0.6561
+; H_4 -3.788  -1.7496
+; H_5 3.788   -1.7496
+; H_6 0   -3.9366
+
+name='7Hole_IRDIS'
+dir='~/code/masking/templates/sphere/'
+;;IRDIS:
+rot=1.0*!pi/2 ;;rotation angle
+extra_scal=1.03
+;;IRDIS POL: for some reason the scaling looks slightly different when in POL mode
+; rot=1.0*!pi/2 ;;rotation angle
+; extra_scal=1.02
+; ;;IFS:
+; rot=1.115*!pi/2 ;;rotation angle
+; extra_scal=1.04
+; ;;ZIMPOL
+; rot=-0.01*!pi/2
+; extra_scal=1.06
+; ;;ZIMPOL POL. For some reason the scaling looks slightly different when in POL mode.
+; rot=-0.01*!pi/2
+; extra_scal=1.07
+
+;;of form: [[x,x,x,x,x,x,x,x],[y,y,y,y,y,y,y,y]]
+xy_coords= [[-1.894,1.894,-3.788,-1.894,-3.788,3.788,0],[3.7179,3.7179,0.4374,-0.6561,-1.7496,-1.7496,-3.9366]] ;;in mm from centre of mask. Need in metres in pupil.
+mirrorsz=8.1
+;;holesize=1.375mm
+masksz=10.5;; No idea.
+
+;;rotate, flip and scale mask:
+xy_coords=[[xy_coords[*,1]],[xy_coords[*,0]]]
+xy_coords[*,1]*=-1
+xy_coords*=extra_scal*mirrorsz/masksz ;;also converts to metres
+rot_xy_coords=xy_coords
+for i=0,n_elements(xy_coords)/2-1 do begin
+   oldx=xy_coords[i,0]
+   oldy=xy_coords[i,1]
+   theta=atan(oldx,oldy) ;;angle from y axis
+   
+   ;newx=oldx*sin(theta+rot)/sin(theta)
+   ;newy=oldy*cos(theta+rot)/cos(theta)
+   newx=oldx*cos(rot)-oldy*sin(rot)
+   newy=oldy*cos(rot)+oldx*sin(rot)
+   rot_xy_coords[i,*]=[newx,newy]
+endfor
+xy_coords=rot_xy_coords
+
+n_holes=n_elements(xy_coords)/2
+;;get arrays ready:
+f_cov=fltarr(2,n_holes,n_holes)
+b_lengths=fltarr(n_holes,n_holes)
+b_angles=b_lengths
+
+for i=0,n_holes-1 do begin
+    this_xy=xy_coords[i,*]
+
+    for j=0,n_holes -1 do begin
+        new_xy=xy_coords[j,*]
+        
+        ;;f_cov is the distances between holes:
+        f_cov[*,j,i]=new_xy-this_xy
+        
+        ;;baseline length
+        b_lengths[j,i]=sqrt(total((new_xy-this_xy)^2))
+        
+        ;;baseline angle:
+        if i eq j then b_angles[j,i]=0 else begin
+            ang=atan((new_xy[1]-this_xy[1]),(new_xy[0]-this_xy[0]))
+            if j gt i then ang=ang+!dpi
+            b_angles[j,i]= ang
+        endelse
+    endfor
+endfor
+
+outname=dir+'info_'+name+'.idlvar'
+save,xy_coords,f_cov,b_lengths,b_angles,filename=outname
+print,'Saved as: ',outname
+
+end
+
