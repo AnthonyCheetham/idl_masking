@@ -1,0 +1,145 @@
+
+; INPUTS:
+; Model of a binary star, each with UD sizes and a ratio.
+; Params:
+;   params(0) = Separation (mas)
+;   params(1) = Position Angle (degs,
+;               E of N, pointing from primary -> secondary)
+;   params(2) = Brightness Ratio of Primary over Secondary
+;   params(3) = UD size of primary (mas)
+;   params(4) = UD size of secondary (mas)
+params=[10.,90,1.0,1,1]
+
+outfile='MWC361.2004Dec.fine.idlvar'
+visdir='/n/51peg2/Monnier/Latex/IONIC3_YSO_2005/Data/'
+;visfile='UVAVG.MWC361.2005Jun.oifits'
+visfile='MWC361.2004Dec.A35B15C00.oifits'
+;visfile='MWC361.2004Jun.A35B15C10.oifits'
+;visfile='MWC361.2003Nov.A35B15C10.oifits'
+;visfile='MWC361.2003Jun.A35B15C10.oifits'
+;visfile='MWC361.2003Jun.A35B15C10.oifits'
+minvis2err=0.05 ; percentage
+minvis2err1=0.02 ; additive
+cperr=.5
+
+xv=pvector([-22,22.,88])
+yv=xv
+xv=reverse(xv)
+xv=pvector([5,-10,100])
+yv=pvector([-5,0,50])
+
+nx=n_elements(xv)
+ny=n_elements(yv)
+chi2s=fltarr(nx,ny)
+chi2s(*)=1e9
+ratio=fltarr(nx,ny)
+diam1=fltarr(nx,ny)
+diam2=fltarr(nx,ny)
+
+cleanplot
+extract_vis2data,vis2data0,file=visdir+visfile
+extract_t3data,t3data0,file=visdir+visfile
+vis2data0.vis2err=vis2data0.vis2err>(minvis2err*vis2data0.vis2data)
+vis2data0.vis2err=vis2data0.vis2err>minvis2err1
+t3data0.t3phierr=t3data0.t3phierr>cperr
+
+
+nparms=n_elements(params)
+parinfo = replicate({value:0.D, fixed:0, limited:[0,0], $
+                                  limits:[0.D,0],step:0d0,relstep:0.d0,tied:''}, nparms)
+parinfo(0:1).fixed=1
+parinfo(3).fixed=1
+parinfo(4).fixed=1
+
+parinfo(2).limited=[1,0]
+parinfo(2).limits=[1.0,0]
+parinfo(3).limited=[1,1]
+parinfo(3).limits=[0.001,5.]
+;parinfo(2).step=.001
+;parinfo(3).relstep=.01
+;parinfo(4).step=.01
+
+
+vis2model0=vis2data0
+t3model0=t3data0
+nv=n_elements(vis2data0)
+
+fa={$
+    vis2data0:vis2data0,t3data0:t3data0,$ 
+    vis2model0:vis2model0,t3model0:t3model0}
+thebest=[0,0,6.5,3.6,.001]
+for xx=0,nx-1 do begin
+ for yy=0,ny-1 do begin
+  x0=xv(xx)
+  y0=yv(yy)
+  ri2at,y0,x0,aa,tt
+  params=thebest
+  params(0:1)=[aa,tt]
+  params=[aa,tt,6.5,3.6,0.01]
+goto,skipfit
+
+  best_params = mpfit('binary_mpfunc', params, functargs=fa,bestnorm=bestnorm,$
+           parinfo=parinfo,perror=perror,covar=covar,status=status,/quiet)
+params=best_params
+parinfo(3).fixed=0
+best_params = mpfit('binary_mpfunc', params, functargs=fa,bestnorm=bestnorm,$
+           parinfo=parinfo,perror=perror,covar=covar,status=status,/quiet)
+skipfit:
+best_params=params
+resid=binary_mpfunc(best_params,dp,vis2data0=vis2data0,t3data0=t3data0,$
+                           vis2model0=vis2model0,t3model0=t3model0)
+bestnorm=total( resid*resid)
+    bestnorm=bestnorm/n_elements(resid)
+; print,"Min Chi2/DOF: ", bestnorm
+chi2s(xx,yy)=bestnorm
+ratio(xx,yy)=best_params(2)
+diam1(xx,yy)=best_params(3)
+diam2(xx,yy)=best_params(4)
+
+if (float(bestnorm) eq min(chi2s)) then begin 
+THEBEST = best_params
+print,bestnorm,best_params
+endif
+
+endfor
+print,xx,nx-1,'best: ',min(chi2s)
+;probs=exp(-.5*chi2s)
+probs=exp(-.5*chi2s/(min(chi2s)>1))
+if ( (xx mod 10) eq 1)  then begin
+image_cont_uv,probs,/asp,xv=xv,yv=yv
+oplot,[0],[0],psym=1
+endif
+endfor
+image_cont_uv,probs,/asp,xv=xv,yv=yv
+
+resid=binary_mpfunc(thebest,dp,vis2data0=vis2data0,t3data0=t3data0,$
+                           vis2model0=vis2model0,t3model0=t3model0)
+
+print,'Best Params:',thebest
+
+
+!p.multi=[0,3,1]
+image_cont_uv,probs,/asp,xv=xv,yv=yv
+oplot,[0],[0],psym=1
+
+
+plotsym,0,/fill
+;plot,vis2data0.baseline,vis2data0.vis2data,psym=4,$
+; xtit="Baseline (m)",ytit="Vis2"
+;oplot,vis2model0.baseline,vis2model0.vis2data,psym=8
+
+plotsym,0,/fill
+
+ploterror,vis2model0.vis2data,vis2data0.vis2data,vis2data0.vis2err,psym=8,$
+   xtit="Model Vis2",ytit="Data Vis2"
+oplot,[0,2],[0,2]
+;stop
+
+ploterror,t3model0.t3phi,t3data0.t3phi,t3data0.t3phierr,psym=8,$
+  xtit="Model CP (degs)",ytit="Data CP (degs)"
+oplot,[-180,180],[-180,180]
+
+save,file=outfile,chi2s,probs,chi2s,ratio,diam1,diam2,xv,yv,$
+  vis2data0,vis2model0,t3data0,t3model0,thebest
+end
+
