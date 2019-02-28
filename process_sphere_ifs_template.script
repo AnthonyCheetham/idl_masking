@@ -1,9 +1,9 @@
-;; Example script to process SPHERE IRDIS DBI/CI data through pipeline. 
+;; Example script to process SPHERE IFS data through pipeline. 
 ;; Will produce oifits files.
 
-save_dir='~/data/sphere_data/HD142527_SAM/IRDIS/Analysis/'
-data_dir='~/data/sphere_data/HD142527_SAM/IRDIS/Raw/'
-prefix='SPHERE_IRDIFS_IRDIS_OBS137_'
+save_dir='~/data/sphere_data/HD142527_SAM/IFS/Analysis/'
+data_dir='~/data/sphere_data/HD142527_SAM/IFS/Raw/'
+prefix='SPHERE_IRDIFS_IFS_OBS103_'
 
 frames=54+findgen(48) ;; files with the same number will be processed together, negative numbers note targets
 tsize=[0.01+fltarr(4),-0.02+fltarr(4),0.03+fltarr(4),0.04+fltarr(4),0.05+fltarr(4),-0.06+fltarr(4),$
@@ -20,10 +20,10 @@ extn='.fits'
 ;; Negative numbers mean no rejection! 
 discard_sigma=[-2., -2., 5., -3.6, -0.7] 
 
-
-flatpath='../Cal/sphere_irdis_flat.idlvar'
-
-skies='../Cal/'+['SPHERE_IRDIFS_IRDIS_SKY103_0010.fits','SPHERE_IRDIFS_IRDIS_SKY103_0011.fits']
+;; Flat fielding is already done in esorex
+flatpath=''
+;; Sky subtraction is also handled by esorex, but you can also do it here
+skies='../Cubed/'+['SPHERE_IRDIFS_IFS_SKY103_0010.fits','SPHERE_IRDIFS_IFS_SKY103_0011.fits']
 
 cd,save_dir
 

@@ -8,21 +8,23 @@
 
 save_dir='~/data/gpi_data/gpi_Apr15/Analysis_poltests/'
 data_dir='~/data/gpi_data/gpi_Apr15/Cubed_poltests/'
-prefix='S20150414S'
+prefix='S20150414S' ;; Start of the filenames
 
-frames=419+findgen(5) ;;the numbers at the end of your data
-frames=[419,420,422,423,424,425,426,427,428,429,430,431,432,433,435,436,438]
+frames=[419,420,422,423,424,425,426,427,428,429,430,431,432,433,435,436,438] ;;the numbers at the end of your data
 tsize=[-0.01+fltarr(17)] ;; files with the same number will be processed together, negative numbers note targets
 
 ;; Things that you shouldnt need to touch
-jobname='' ;;just a name thats added to the files
+jobname='' ;;just a name thats added to the output files
 extn='_podc.fits'
-discard_sigma=[-2.,-2.,5.,-3.6,-0.7]
 nbootstrap=1000 ;; number of bootstrap iterations to get uncertainties
 
-;;!!!!!!!!!!!!!
-;;AUTOMATIC BELOW HERE
-;;!!!!!!!!!!!!!
+;; discard_sigma defines criteria for automatic frame rejection. 
+;; The 5 entries are the number of sigma to reject based on:
+;;   [x position, y position, total flux, peak flux]
+;; if there is a 5th entry, it repeats the peak flux calculation using 
+;;  only discard_sigma[4] percent of frames to get the mean and st.dev.
+;; Negative numbers mean no rejection! 
+discard_sigma=[-2., -2., 5., -3.6, -0.7] 
 
 ;;neither of these are needed in qbe_gpi (since they are done in the GPI pipeline)
 flatpath=''
@@ -35,7 +37,7 @@ qbe_gpi,data_dir, jobname, flatpath, frames,skies, tsize,extn=extn,prefix=prefix
 ;;get the visibilities and closure phases
 calc_bispect, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/"
 
-;; I lied. You need to choose which tsize value you set above for the target you want to look at
+;; Now you need to choose which tsize value you set above for the target you want to look at
 stop
 tsize_target=-0.01
 
