@@ -31,8 +31,8 @@ yy=yy-y
 
 IMage=sqrt(1/a*xx*xx+1/b*yy*yy)
 pvect=where(image le r)
-image(pvect)=1.0*sz
-image(where(image gt r))=0.0
+image[pvect]=1.0*sz
+image[where(image gt r)]=0.0
 if keyword_set(double) eq 0 then image = float(image)
 IM=IM+image
 

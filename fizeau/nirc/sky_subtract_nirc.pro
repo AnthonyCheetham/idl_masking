@@ -52,8 +52,8 @@ make_circle,mask,x/2,y/2,radius
 mask=shift(mask,xpeak-x/2,ypeak-y/2)
 index=where(mask eq 0 and bad_mask eq 0)
 if (keyword_set(binsize) eq 0) then binsize=stdev(image(index))/20.
-plothist,image(index),x1,v2,bin=binsize,/noplot
-imagenoise=sky_noise(image(index),imagelevel)  ;**** PGT Bugfix. Moved line to here ...
+plothist,image[index],x1,v2,bin=binsize,/noplot
+imagenoise=sky_noise(image[index],imagelevel)  ;**** PGT Bugfix. Moved line to here ...
 
 b2=[total(v2)*binsize,imagelevel,imagenoise]
 weights=replicate(1.0,n_elements(v2))

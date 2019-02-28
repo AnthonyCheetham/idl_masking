@@ -29,13 +29,13 @@ endif else begin
     xmax=x+dif < ( (size(image))(1)-1 )
     ymin=y-dif > 0
     ymax=y+dif < ( (size(image))(2)-1 )
-    image1=image(xmin:xmax,ymin:ymax)
+    image1=image[xmin:xmax,ymin:ymax]
   endif else begin		; Case2: EVEN n
     xmin=x-dif   > 0
     xmax=x+dif-1 < ( (size(image))(1)-1 )
     ymin=y-dif   > 0
     ymax=y+dif-1 < ( (size(image))(2)-1 )
-    image1=image(xmin:xmax,ymin:ymax)
+    image1=image[xmin:xmax,ymin:ymax]
   endelse
   x=xmin
   y=ymin
