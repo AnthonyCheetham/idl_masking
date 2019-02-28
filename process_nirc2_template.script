@@ -1,0 +1,48 @@
+;; Example script to process Keck NIRC2 data through pipeline. 
+;; Will produce oifits files.
+
+save_dir='/Volumes/Cheetham/data/nirc2_data/HD259431_sam/Analysis/'
+data_dir='/Volumes/Cheetham/data/nirc2_data/HD259431_sam/Raw/'
+prefix='n'
+
+frames = [439+indgen(12), 452 +indgen(12), 465 +indgen(12), 477 +indgen(12)];;the numbers at the end of your data
+tsize = [0.01+fltarr(12),-0.02+fltarr(12), 0.03+fltarr(12),-0.04+fltarr(12)];; files with the same number will be processed together, negative numbers note targets
+
+;; Things that you shouldnt need to touch
+jobname='' ;;just a name thats added to the files
+extn='.fits.gz'
+discard_sigma=[-2.,-2.,5.,-3.6,-0.7] ;;Some limits for automatic frame rejection. Negative numbers mean no rejection. 
+                                     ;;The way that these work hasn't been tuned for SPHERE, so you will have to remove 
+                                     ;;files by hand for now.
+
+flatpath='../flats/flat_K_512x512.idlvar'
+skies=[451,464]
+ddir_sky = '/Volumes/Cheetham/data/nirc2_data/HD259431_sam/Cal/'
+
+;; Iterate through the files and get the target name from the header
+n_targ = n_elements(frames)
+targ_names = strarr(n_targ)
+for ix=0,n_elements(frames)-1 do begin
+	fname = data_dir+prefix+string(frames[ix],format='(I04)')+extn
+	hdr = headfits(fname)
+	targ_name = sxpar_conica(hdr,'OBJECT',nchar=6) 
+	targ_names[ix] = targ_name
+endfor
+
+
+
+;;;
+cd,save_dir
+
+;;cube the data
+!except=1
+qbe_nirc2,data_dir, jobname, flatpath,skies,ddir_sky=ddir_sky, frames=frames,tsize=tsize,extn=extn,discard_sigma=discard_sigma
+; !except=2
+;;get the visibilities and closure phases
+calc_bispect, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/"
+;;calibrate the data
+calibrate_v2_cp,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/',/skip_cp_rejection,/cal4src
+
+; binary_grid,'MWC147_0452mrg.oifits',init_crat=1000
+
+end
