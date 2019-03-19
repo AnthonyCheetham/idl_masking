@@ -2,6 +2,12 @@
 ; Program to flag bad data frames for Conica
 ;
 ; Version 0.0 From cube_nirc2  PGT 25Oct05
+;;
+;; discard_sigma is the number of sigma for:
+;;   [x position, y position, total flux, peak flux]
+;; if there is a 5th entry, it repeats the peak flux calculation using 
+;;  only discard_sigma[4] percent of frames to get the mean and st.dev.
+;;
 
 function flagbad_conica,fstats,cube,discard_sigma,tot_bad
 

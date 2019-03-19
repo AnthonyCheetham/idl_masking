@@ -316,7 +316,7 @@ if (strpos(iname,'SPHERE') ne -1) then begin
 
   ;; Work out what camera it is
   camera=sxpar_conica(head,'ESODETID',nchar=8) ;; IRDIS and IFS have it here
-  if type(camera) eq type(0) then camera=sxpar_conica(head,'ETDEV1ID') ;; ZIMPOL has it here
+  if typename(camera) ne typename('string') then camera=sxpar_conica(head,'ETDEV1ID') ;; ZIMPOL has it here
   camera=strcompress(camera,/remove_all)
   olog.optic_cfg[ix]=camera
 
