@@ -54,8 +54,8 @@ chipsz = 256 	; array size.
 ;rad_pixel = mas2rad(14.3) ;; GPI (from GPI website, +/- 0.1mas/pix)
 ; rad_pixel = mas2rad(14.14) ;; GPI (from Konopacky SPIE 2014, +/- 0.01mas/pix)
 ; rad_pixel = mas2rad(12.237)      ; SPHERE IRDIS plate scale (12.2525 (average H2 H3 plate scale with coro) / 1.0015)
-; rad_pixel = mas2rad(12.267/1.0015)  ; SPHERE IRDIS plate scale for K1.
-rad_pixel = mas2rad(7.46)       ; SPHERE IFS scaled plate scale from headers
+rad_pixel = mas2rad(12.267/1.0015)  ; SPHERE IRDIS plate scale for K1.
+; rad_pixel = mas2rad(7.46)       ; SPHERE IFS scaled plate scale from headers
 ; rad_pixel = mas2rad(6.8)         ; SPHERE ZIMPOL plate scale from headers
 ;----------------------------------------------------------
 
@@ -103,8 +103,8 @@ tmpl_root='~/code/masking/templates/'
 ;---GPI---
 ;maskname='g10s40' & hole_diam = 0.6605 & restore,  tmpl_root+'/gpi/info_g10s40.idlvar'; holes 0.920mm on mask
 ;---SPHERE---
-; maskname='7Hole_IRDIS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IRDIS.idlvar' ; no idea of hole size
-maskname='7Hole_IFS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IFS.idlvar' ; no idea of hole size
+maskname='7Hole_IRDIS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IRDIS.idlvar' ; no idea of hole size
+; maskname='7Hole_IFS' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_IFS.idlvar' ; no idea of hole size
 ; maskname='7Hole_ZIMPOL' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_ZIMPOL.idlvar' ; no idea of hole size
 ; maskname='7Hole_ZIMPOL' & hole_diam=1.2 & restore,tmpl_root+'sphere/info_7Hole_ZIMPOL_pol.idlvar' ; no idea of hole size
 ;---- SIMU----
@@ -227,13 +227,14 @@ wav_file = ''
 ; filter=[1.62715e-6,0.0763e-6]  & filname='D_H23' & n_wavs=2 ;; H23 filter. Each channel is ~55nm wide.
 ; offs=0.01e-6 & filter=[1.627826e-6+0.5*offs,0.078634e-6+offs]  & filname='D_H23' & n_wavs=2 ;; H23 filter, with a hack to account for the smaller plate scale in H3
 ; filter=[2.17875e-6,0.1525e-6]  & filname='D_K12' & n_wavs=2 ;; K12 filter. Each channel is ~100nm wide.
+filter=[2.1813e-6,0.e-6]  & filname='CI_B_Ks' & n_wavs=2 ;; K12 filter. Each channel is ~100nm wide.
 ; filter=[2.17875e-6,0.1525e-6]  & filname='D_K12_Test' & n_wavs=2 ;; K12 filter. Each channel is ~100nm wide.
 ; filter = [2.1629e-6,0.0e-6] & filname ='CI_BrG' & n_wavs = 2 ;; BrG filter. Both bands are the same wavelength
 ; filter=[2.2875e-6,0.e-6] & filname='CI_N_CO' & n_wavs=2 ;; NB_CO filter. Both bands are the same wavelength
 ;;---- SPHERE-IFS ------
 ; filter=[1.15e-6,0.3800e-6]  & filname='YJ' & n_wavs=39 & wav_file='sphere/ifs_yj.fits' ;; YJ filter. Each channel is ~55nm wide. But use the actual values in the fits file
 ; filter=[1.30e-6,6.9e-7] & filname='YJH' & n_wavs=39 & wav_file='sphere/ifs_yh.fits' ;; YH filter. But use the actual values in the fits file
-filter=[1.30e-6,6.9e-7] & filname='YJH_Test' & n_wavs=39 & wav_file='sphere/ifs_yh.fits' ;; YH filter. But use the actual values in the fits file
+; filter=[1.30e-6,6.9e-7] & filname='YJH_Test' & n_wavs=39 & wav_file='sphere/ifs_yh.fits' ;; YH filter. But use the actual values in the fits file
 ;;---- SPHERE-ZIMPOL ------
 ;; Sorry, this is going to be messy due to the number of combinations.
 ;;   N_R  = 645.9 +/- 56.7
