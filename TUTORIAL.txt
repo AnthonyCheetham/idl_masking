@@ -1,0 +1,72 @@
+Tutorial:
+	- The easiest way to process a dataset is to start with the relevant template reduction script in the main directory.
+	- The pipeline will need to be run separately for each filter and instrument combination
+	- The main parts of the pipeline are:
+		1. Clean the data (handled by qbe_sphere, qbe_gpi, qbe_conica, qbe_nirc2 etc.)
+		2. Calculate the interferometric observables (calc_bispect or calc_bispect_gpi)
+		3. Calibrate the interferometric observables (calibrate_v2_cp or calibrate_v2_cp_gpi)
+	- This will produce an OIFITS file with calibrated visibilities, closure phases and bispectral amplitudes.
+
+Some notes:
+	- NACO / CONICA has a GUI for creating a script to process the data if you prefer. Just run qball_conica.
+	- This guide is for regular single-filter or IFU SAM data, not SAMPOL.
+	- You can repeat steps if necessary. e.g. if you run the whole pipeline once you can run the calibration step again several times to try different schemes
+
+1. Cleaning the data
+	- Use the instrument specific routine (e.g. qbe_conica for naco / conica data)
+	- Common inputs that you might need to change are:
+		- prefix: the part of the file names that is common to each file.
+		- frames: an array with the numbers in each file name
+		- extn: the file extension. Filenames are built by prefix+string(frames)+extn
+		- tsize: an array of the same size as frames. In practice this is used to denote files that will be processed together in a block. "Target" stars should have negative numbers, while "calibrators" should have positive numbers. Behind the scenes, this actually indicates the angular size of each target (in mas) for a correction applied to the V^2 for each calibrator at the calibrate_v2_cp step.
+		- skies: Used to determine how to do the sky subtraction. The simplest two options are listed below. See the relevant qbe_ file for more info.
+			skies = [array of file names]: The mean of these files will be subtracted from all files. Used when dedicated sky frames are taken.
+			skies = -1 : Assume data are dithered or no sky subtraction is necessary. If dithered, 1 sky frame will be subtracted from all data
+		- flatpath: path to a flat field idl file. Some routines to make flats for CONICA (conica_calibrate.script) and NIRC2 (nirc2_flats.script) are located in fizeau/flats/
+	
+2. Calculate the interferometric observables
+	- This should hopefully work smoothly with no input. It will plot the raw V^2 and closure phases for the data, as well as show each Fourier transform and an overlay of the positions used to measure the quantities (so you can check that they align).
+
+3. Calibrate the interferometric observables
+	- You have to somehow tell the program which files to use as calibrators and which ones to use as targets. This is handled by the cal4src variable, and there are several ways to make it.
+	- cal4src is an n_files x n_files array. If cal4src[x,y] =1 , then file y will be assumed to be a target that needs to be calibrated with file x.
+	- You can fill it in manually, (e.g. see below for some example code exploiting the tsize variable), or automatically by setting cal4src=1 to use Anthony's GUI.
+		- If you use cal4src =1, it opens a plot window showing the array, and gives you options for clicking to select various parts (whole blocks, individual files, restricting to files in the same quadrant of the detector etc.). By default it is locked to only allow you to select cal4src[x,y]=1 if tsize[x]>0 and tsize[y]<0 but this can be disabled by selecting "Allow Cal-Cal blocks". This GUI is more useful for very large datasets and multiple targets.
+	- Once cal4src is defined it will calculate the calibrator quantities and subtract or divide them from the target quantities. If there are only a few files it will ask you to manually select bad calibrators, but if there are a lot then it will do it automatically.
+	- Some other plots that might show up:
+		- Histogram of the calibrated closure phase uncertainties. It might ask you to click on the histogram to enforce a minimum and maximum uncertainty if you didn't set skip_cp_rejection=1
+		- Plot showing the V^2 measured on each baseline divided by a linear fit with baseline length, to see if you want to reject one or more holes that might have low visibility. This can be skipped with skip_baseline_rejection=1
+
+4. Output OIFITS (and binary star model fitting)
+	- The pipeline will output a number of OIFITS files. There will be one for each target input file, and two larger files that have all the data merged together. 
+	- The file ending in mrg.oifits has a few non-standard uses of some OIFITS keywords that break several other pipelines but are required by the binary_grid IDL program.
+	- The file ending in _python_mrg.oifits is the same as the mrg.oifits one, but should not break OIFITS standards (although it cannot be used by binary_grid).
+	- To fit a binary model, run binary_grid on the mrg oifits file.
+	- Further fitting tools in python are available at https://github.com/AnthonyCheetham/pymask
+
+
+###########
+
+; Filling in cal4src manually
+; e.g. to calibrate all files with tsize = -0.01 or -0.03 with all files with tsize 0.02 or 0.04 or 0.05:
+
+targ_tsize = [-0.01,-0.03]
+cal_tsize = [0.02, 0.04, 0.05]
+
+n_obs = n_elements(tsize)
+cal4src = intarr(n_obs,n_obs)
+targs = intarr(n_obs)
+cals = intarr(n_obs)
+for ix1 = 0, n_elements(targ_tsize) -1 do begin
+    targs[where(tsize eq targ_tsize[ix1])]=1
+endfor
+for ix2 = 0, n_elements(cal_tsize)-1 do begin
+    cals[where(tsize eq cal_tsize[ix2])] =1
+endfor
+targ_ix = where(targs)
+cal_ix = where(cals)
+for ix1 = 0, n_elements(targ_ix)-1 do begin
+    for ix2 = 0,n_elements(cal_ix)-1 do begin
+      cal4src[cal_ix[ix2],targ_ix[ix1]] = 1
+    endfor
+endfor

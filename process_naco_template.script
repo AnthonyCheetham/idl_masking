@@ -1,0 +1,40 @@
+;; Example script to process SPHERE IRDIS DBI/CI data through pipeline. 
+;; Will produce oifits files.
+
+save_dir='~/data/naco_data/SAM/HIP74865/Analysis/'
+data_dir='~/data/naco_data/SAM/HIP74865/Raw/'
+prefix='SPHERE_IRDIFS_IRDIS_OBS137_'
+
+frames=54+findgen(48) ;; files with the same number will be processed together, negative numbers note targets
+tsize=[0.01+fltarr(4),-0.02+fltarr(4),0.03+fltarr(4),0.04+fltarr(4),0.05+fltarr(4),-0.06+fltarr(4),$
+	0.07+fltarr(4),0.08+fltarr(4),0.09+fltarr(4),-0.10+fltarr(4),0.11+fltarr(4),0.12+fltarr(4)] ;; files with the same number will be processed together, negative numbers note targets
+
+jobname='' ;;just a name thats added to the output files
+extn='.fits'
+
+;; discard_sigma defines criteria for automatic frame rejection. 
+;; The 5 entries are the number of sigma to reject based on:
+;;   [x position, y position, total flux, peak flux]
+;; if there is a 5th entry, it repeats the peak flux calculation using 
+;;  only discard_sigma[4] percent of frames to get the mean and st.dev.
+;; Negative numbers mean no rejection! 
+discard_sigma=[-2., -2., 5., -3.6, -0.7] 
+
+
+flatpath='../Cal/flat.idlvar' ;; this file should be an IDL save file with two variables: flat (with the same size as the data), and bad_pixels (a list of the bad pixels)
+
+skies=-1
+
+cd,save_dir
+
+;;cube the data
+qbe_conica,data_dir, jobname, flatpath, frames,skies, tsize,extn=extn,prefix=prefix,cutsize=256,discard_sigma=discard_sigma,/centre_once_per_cube
+;;get the visibilities and closure phases
+calc_bispect_gpi, save_dir+"cubeinfo"+jobname+".idlvar" , root_dir="~/code/masking/"
+;;calibrate the data
+calibrate_v2_cp_gpi,save_dir+"cubeinfo"+jobname+".idlvar",/save_python,root_dir='~/code/masking/',/skip_cp_rejection,/cal4src
+
+;; Fit a binary model to the data and calculate detection limits
+binary_grid,'HD142527_0000_mrg.oifits' ;; you will have to change the filename here to your output oifits
+
+end
