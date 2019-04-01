@@ -974,7 +974,7 @@ if (average_src eq 0) then begin
     merge_oidata, outfile=savestrings[0]+'mrg.oifits',  infiles=savestrings+'.oifits'
     clog.primary_oifits = savestrings[0]+'mrg.oifits'
     ;;ACC: fix all the problems caused by merge_oidata
-    if keyword_set(save_python) then fix_oifits,savestrings[0]+'mrg.oifits',savestrings[0]+'_python_mrg.oifits',/python 
+    if keyword_set(save_python) then fix_oifits,savestrings[0]+'mrg.oifits',savestrings[0]+'_python_mrg.oifits',/python,/flag
     fix_oifits,savestrings[0]+'mrg.oifits',savestrings[0]+'mrg.oifits',python=0
 endif else clog.primary_oifits = savestrings[0]+'.oifits'
 print,  '******** Primary oifits file: ',  clog.primary_oifits
